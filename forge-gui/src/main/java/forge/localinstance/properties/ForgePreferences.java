@@ -17,13 +17,13 @@
  */
 package forge.localinstance.properties;
 
-import java.util.EnumSet;
-import java.util.Set;
-import java.util.StringJoiner;
-
 import forge.MulliganDefs;
 import forge.game.GameLogEntryType;
 import forge.game.GameLogVerbosity;
+
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.StringJoiner;
 
 public class ForgePreferences extends AbstractPreferences<ForgePreferences.FPref> {
 
@@ -35,6 +35,7 @@ public class ForgePreferences extends AbstractPreferences<ForgePreferences.FPref
 
         // Desktop only
         UI_COMPACT_MAIN_MENU ("false"),
+        UI_PREFETCH_CARD_POOL_IMAGES("false"),
         UI_SCREENREADER_OPTIMIZE("false"),
         UI_TOUCHSCREEN_OPTIMIZE("false"),
         UI_DOCK_LAYOUT (""),

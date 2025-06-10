@@ -20,13 +20,17 @@ package forge.item;
 import forge.ImageKeys;
 import forge.StaticData;
 import forge.card.*;
-import forge.util.*;
-import org.apache.commons.lang3.StringUtils;
+import forge.util.CardTranslation;
+import forge.util.ImageUtil;
+import forge.util.Localizer;
+import forge.util.TextUtil;
 
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * A lightweight version of a card that matches real-world cards, to use outside of games (eg. inventory, decks, trade).
