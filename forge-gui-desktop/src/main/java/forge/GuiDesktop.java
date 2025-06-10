@@ -372,4 +372,5 @@ public class GuiDesktop implements IGuiBase {
     public float getScreenScale() {
         return screenScale;
     }
+
 }
