@@ -23,6 +23,12 @@ public abstract class ImageFetcher {
     protected static final boolean disableHostedDownload = true;
     protected static volatile Date scryfallCooldownTime = null;
     private static final HashSet<String> fetching = new HashSet<>();
+    /**
+     * If the size of the fetching queue exceeds this threshold,
+     * we need to start rate-limiting.
+     * @implNote This threshold should correspond with {@link ThreadUtil#IMAGE_FETCH_THREAD_COUNT}.
+     */
+    private static final int BULK_FETCH_THRESHOLD = 10;
 
     /** Minimum gap between Scryfall requests, matching what GuiDownloadService already keeps. */
     private static final long SCRYFALL_MIN_INTERVAL_MS = 100;
@@ -511,11 +517,21 @@ public abstract class ImageFetcher {
             }
             currentFetches.remove(destPath);
         };
+
         try {
-            ThreadUtil.getServicePool().submit(getDownloadTask(downloadUrls.toArray(new String[0]), destPath, notifyObservers));
+            Runnable downloadTask = getDownloadTask(downloadUrls.toArray(new String[0]), destPath, notifyObservers);
+            /* Using the scheduled executor service unconditionally for all fetches would
+             * add an unnecessary 1s delay to one-off fetches.
+             */
+            if (currentFetches.size() <= BULK_FETCH_THRESHOLD) {
+                ThreadUtil.getServicePool().submit(downloadTask);
+            } else {
+                ThreadUtil.scheduleImageFetch(downloadTask);
+            }
         } catch (RejectedExecutionException re) {
             re.printStackTrace();
         }
+
     }
 
     protected abstract Runnable getDownloadTask(String[] toArray, String destPath, Runnable notifyObservers);
