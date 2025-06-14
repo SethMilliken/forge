@@ -206,6 +206,9 @@ public class ImageUtil {
             editionCode = setCode;
         else
             editionCode = cp.getEdition().toLowerCase();
+        if (setCode.equals("PLIST")) {
+            editionCode = "PLST";
+        }
         String cardCollectorNumber = cp.getCollectorNumber();
         // Hack to account for variations in Arabian Nights
         cardCollectorNumber = cardCollectorNumber.replace("+", "†");
