@@ -467,6 +467,10 @@ public abstract class ItemManager<T extends InventoryItem> extends JPanel implem
         this.pool = pool0;
         this.model.addItems(this.pool);
         this.model.setInfinite(infinite);
+        this.postSetPool();
+    }
+
+    protected void postSetPool() {
         this.updateView(true, null);
     }
 
