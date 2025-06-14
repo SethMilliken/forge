@@ -364,7 +364,11 @@ public final class CardEdition implements Comparable<CardEdition> {
     public Date getDate()  { return date;  }
     public String getCode()  { return code;  }
     public String getCode2() { return code2; }
-    public String getScryfallCode() { return scryfallCode.toLowerCase(); }
+    public String getScryfallCode() {
+        if (scryfallCode.equals("PLIST")) {
+            scryfallCode = "PLST";
+        }
+        return scryfallCode.toLowerCase(); }
     public String getTokensCode() { return tokensCode.toLowerCase(); }
     public String getCardsLangCode() { return cardsLanguage.toLowerCase(); }
     public Type   getType()  { return type;  }

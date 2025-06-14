@@ -213,6 +213,9 @@ public class ImageUtil {
             editionCode = setCode;
         else
             editionCode = cp.getEdition().toLowerCase();
+        if (setCode.equals("PLIST")) {
+            editionCode = "PLST";
+        }
         String cardCollectorNumber = cp.getCollectorNumber();
         // override old planechase sets from their modified id since scryfall move the planechase cards outside their original setcode
         if (cardCollectorNumber.startsWith("OHOP")) {

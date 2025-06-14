@@ -16,7 +16,12 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public abstract class ImageFetcher {
+    private static final Logger log = LoggerFactory.getLogger(ImageFetcher.class);
+
     // see https://scryfall.com/docs/api/languages and
     // https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
     private static final HashMap<String, String> langCodeMap = new HashMap<>();
@@ -183,6 +188,9 @@ public abstract class ImageFetcher {
             final String filename = imageKey.substring(ImageKeys.BOOSTER_PREFIX.length());
             // Look up the download URL from booster-images.txt
             final List<String> boosterFileContent = FileUtil.readFile(ForgeConstants.IMAGE_LIST_QUEST_BOOSTERS_FILE);
+            // TODO Update image server or alternative hosting
+            downloadUrls.add("https://downloads.cardforge.org/images/products/boosters/" + filename);
+            log.info("Fetching from %s".formatted(downloadUrls));
 
             for (String line : boosterFileContent) {
                 boolean exactMatch = line.endsWith(filename);
@@ -206,7 +214,7 @@ public abstract class ImageFetcher {
 
             FileUtil.ensureDirectoryExists(ForgeConstants.CACHE_BOOSTER_PICS_DIR);
             File destFile = new File(ForgeConstants.CACHE_BOOSTER_PICS_DIR, filename);
-            System.out.println("Destination File " + destFile.getAbsolutePath() + " exists: " + destFile.exists());
+            log.info("Destination file: %s [exists: %s]".formatted(destFile.getAbsolutePath(), destFile.exists()));
             if (destFile.exists())
                 return;
             setupObserver(destFile.getAbsolutePath(), callback, downloadUrls);
@@ -245,7 +253,7 @@ public abstract class ImageFetcher {
         if (prefix.equals(ImageKeys.CARD_PREFIX)) {
             PaperCard paperCard = ImageUtil.getPaperCardFromImageKey(imageKey);
             if (paperCard == null) {
-                System.err.println("Paper card not found for: " + imageKey);
+                log.error("Paper card not found for: {}", imageKey);
                 return;
             }
             // Skip fetching if it's a custom user card.
@@ -325,7 +333,6 @@ public abstract class ImageFetcher {
                     System.out.println("Card " + paperCard.getName() + " does not have a collector number, skipping scryfall download.");
                     ImageKeys.missingCards.add(filename);
                 }
-                
                 return;
             }
 
@@ -380,7 +387,7 @@ public abstract class ImageFetcher {
 
             if (tempdata.length < 2) {
                 if (!"planechase".equals(tempdata[0]))
-                    System.err.println("Token image key is malformed: " + imageKey);
+                    log.error("Token image key is malformed: {}", imageKey);
                 ImageKeys.missingCards.add(filename);
                 return;
             }
@@ -427,9 +434,9 @@ public abstract class ImageFetcher {
         }
 
         if (downloadUrls.isEmpty()) {
-            System.err.println("No download URLs for: " + imageKey);
+            log.error("No download URLs for: {}", imageKey);
             if (destFile != null) {
-                System.err.println("  You may put your own image in: " + destFile.getAbsolutePath());
+                log.error("  You may put your own image in: {} ", destFile.getAbsolutePath());
             }
             return;
         }
@@ -530,8 +537,10 @@ public abstract class ImageFetcher {
              * add an unnecessary 1s delay to one-off fetches.
              */
             if (currentFetches.size() <= BULK_FETCH_THRESHOLD) {
+                log.trace("Dispatching next request to general thread pool [queueSize: {}]", fetching.size());
                 ThreadUtil.getServicePool().submit(downloadTask);
             } else {
+                log.trace("Dispatching next request to ImageFetcher thread pool [queueSize: {}]", fetching.size());
                 ThreadUtil.scheduleImageFetch(downloadTask);
             }
         } catch (RejectedExecutionException re) {

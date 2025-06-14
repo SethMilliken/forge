@@ -96,9 +96,9 @@ public class CardManager extends ItemManager<PaperCard> {
     }
 
     @Override
-    public void updateView(final boolean forceFilter, final Iterable<PaperCard> itemsToSelect) {
+    protected void postSetPool() {
         prefetchImages();
-        super.updateView(forceFilter, itemsToSelect);
+        super.postSetPool();
     }
 
     private void prefetchImages() {
