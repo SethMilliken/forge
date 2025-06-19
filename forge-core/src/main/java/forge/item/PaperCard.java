@@ -24,11 +24,14 @@ import forge.util.CardTranslation;
 import forge.util.ImageUtil;
 import forge.util.Localizer;
 import forge.util.TextUtil;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * A lightweight version of a card that matches real-world cards, to use outside of games (eg. inventory, decks, trade).
@@ -219,6 +222,10 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
             hasImage = ImageKeys.hasImage(this, update);
         }
         return hasImage;
+    }
+
+    public void invalidateImageCache() {
+        hasImage = false;
     }
 
     public PaperCard(final CardRules rules0, final String edition0, final CardRarity rarity0) {
