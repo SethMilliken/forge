@@ -17,29 +17,6 @@
  */
 package forge;
 
-import java.awt.AlphaComposite;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.geom.RoundRectangle2D;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.util.Calendar;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-
-import javax.imageio.ImageIO;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
-import com.google.common.cache.LoadingCache;
-import com.mortennobel.imagescaling.ResampleOp;
-
 import forge.card.CardSplitType;
 import forge.game.card.Card;
 import forge.game.card.CardView;
@@ -58,6 +35,24 @@ import forge.toolbox.FSkin.SkinIcon;
 import forge.toolbox.imaging.FCardImageRenderer;
 import forge.util.ImageUtil;
 import forge.util.TextUtil;
+
+import java.awt.*;
+import java.awt.geom.*;
+import java.awt.image.*;
+import java.io.File;
+import java.util.Calendar;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
+import com.google.common.cache.LoadingCache;
+import com.mortennobel.imagescaling.ResampleOp;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * This class stores ALL card images in a cache with soft values. this means
@@ -129,6 +124,10 @@ public class ImageCache {
             _stars = (null == stars) ? new BufferedImage(10, 10, BufferedImage.TYPE_INT_ARGB) : stars;
             _inv_stars = (null == inv_stars) ? new BufferedImage(10, 10, BufferedImage.TYPE_INT_ARGB) : inv_stars;
         }
+    }
+
+    public static void invalidate(String imageKey) {
+        _CACHE.invalidate(imageKey);
     }
 
     public static void clear() {
