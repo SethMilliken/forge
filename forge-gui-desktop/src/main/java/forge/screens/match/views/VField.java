@@ -17,16 +17,6 @@
  */
 package forge.screens.match.views;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
-import javax.swing.border.Border;
-import javax.swing.border.LineBorder;
-
 import forge.game.card.CounterEnumType;
 import forge.game.player.PlayerView;
 import forge.game.zone.ZoneType;
@@ -46,111 +36,101 @@ import forge.toolbox.special.PhaseIndicator;
 import forge.toolbox.special.PlayerDetailsPanel;
 import forge.util.Localizer;
 import forge.view.arcane.PlayArea;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import javax.swing.*;
+import javax.swing.border.*;
+
+import net.miginfocom.layout.AC;
+import net.miginfocom.layout.CC;
+import net.miginfocom.layout.LC;
 import net.miginfocom.swing.MigLayout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** 
  * Assembles Swing components of a player field instance.
  * 
- * <br><br><i>(V at beginning of class name denotes a view class.)</i>
+ * @implNote A <i>V</i> prefixed class name indicates a view class.</i>
  */
-public class VField implements IVDoc<CField> {
-    private final static int LIFE_CRITICAL = 5;
-    private final static int POISON_CRITICAL = 8;
+public class VField implements IVDoc<CField>, Localizer.Localizable {
+    private static final Logger log = LoggerFactory.getLogger(VField.class);
+
+    private static final int DEFAULT_TEXT_GAP = DEFAULT_FONT_SIZE / 4;
+
+    private static final int HEIGHT = DEFAULT_FONT_SIZE + (DEFAULT_TEXT_GAP * 4);
+
+    private static final int AVATAR_MIN_WIDTH = 325;
+    private static final int AVATAR_MIN_HEIGHT = AVATAR_MIN_WIDTH * 1;
+    private static final int AVATAR_DEFAULT_WIDTH = AVATAR_MIN_WIDTH * 2;
+    private static final int AVATAR_DEFAULT_HEIGHT = AVATAR_MIN_HEIGHT * 2;
+
+    private static final int COUNTER_MIN_WIDTH = 175;
+    private static final int COUNTER_MIN_HEIGHT = HEIGHT;
+
+    private static final int COUNTER_PANEL_MIN_WIDTH = DEFAULT_TEXT_GAP * 10;
+    private static final int COUNTER_PANEL_DEFAULT_WIDTH = COUNTER_MIN_WIDTH * 4;
+
+    private static final int FRAME_MIN_WIDTH = Math.min(COUNTER_PANEL_MIN_WIDTH, AVATAR_MIN_WIDTH) + COUNTER_MIN_WIDTH;
+    private static final int FRAME_MIN_HEIGHT = (COUNTER_MIN_HEIGHT * 2) + AVATAR_MIN_HEIGHT;
+
+    private static final int[] DEBUG_RATE = {0};
 
     // Fields used with interface IVDoc
     private final CField control;
     private DragCell parentCell;
     private final EDocID docID;
-    private final DragTab tab = new DragTab(Localizer.getInstance().getMessage("lblField"));
+    private final DragTab tab = new DragTab(localize().getMessage("lblField"));
 
     // Other fields
     private final PlayerView player;
 
     // Top-level containers
-    private final FScrollPane scroller = new FScrollPane(false);
-    private final PlayArea tabletop;
-    private final SkinnedPanel avatarArea = new SkinnedPanel();
-
+    private final AvatarArea avatarArea;
     private final PlayerDetailsPanel detailsPanel;
-
-    // Avatar area
-    private final FLabel lblAvatar     = new FLabel.Builder().fontAlign(SwingConstants.CENTER).iconScaleFactor(1.0f).build();
-    private final FLabel lblLife       = new FLabel.Builder().fontAlign(SwingConstants.CENTER).fontStyle(Font.BOLD).build();
-    private final FLabel lblPoison     = new FLabel.Builder().fontAlign(SwingConstants.CENTER).fontStyle(Font.BOLD).icon(FSkin.getImage(FSkinProp.IMG_POISON)).iconInBackground().build();
-    private final FLabel lblEnergy     = new FLabel.Builder().fontAlign(SwingConstants.CENTER).fontStyle(Font.BOLD).icon(FSkin.getImage(FSkinProp.IMG_ENERGY)).iconInBackground().build();
-    private final FLabel lblExperience = new FLabel.Builder().fontAlign(SwingConstants.CENTER).fontStyle(Font.BOLD).icon(FSkin.getImage(FSkinProp.IMG_EXPERIENCE)).iconInBackground().build();
-    private final FLabel lblTicket     = new FLabel.Builder().fontAlign(SwingConstants.CENTER).fontStyle(Font.BOLD).icon(FSkin.getImage(FSkinProp.IMG_TICKET)).iconInBackground().build();
-    private final FLabel lblRad        = new FLabel.Builder().fontAlign(SwingConstants.CENTER).fontStyle(Font.BOLD).icon(FSkin.getImage(FSkinProp.IMG_RAD)).iconInBackground().build();
-
     private final PhaseIndicator phaseIndicator = new PhaseIndicator();
+    private final PlayArea tabletop;
+    private final FScrollPane scroller = new FScrollPane(false);
 
-    private final Border borderAvatarSimple = new LineBorder(new Color(0, 0, 0, 0), 1);
-    private final Border borderAvatarHighlighted = new LineBorder(Color.red, 2);
-
-
-    //========= Constructor
     /**
-     * Assembles Swing components of a player field instance.
-     * 
-     * @param p &emsp; {@link forge.game.player.Player}
-     * @param id0 &emsp; {@link forge.gui.framework.EDocID}
+     * Constructor
+     *
+     * @param matchUI &emsp; {@link forge.screens.match.CMatchUI} associated with this <code>VField</code>.
+     * @param id0 &emsp; {@link forge.gui.framework.EDocID} identifier
+     * @param p &emsp; {@link forge.game.player.Player} associated with this <code>VField</code>.
+     * @param mirror &emsp; passed through to {@link forge.view.arcane.PlayArea}.
      */
     public VField(final CMatchUI matchUI, final EDocID id0, final PlayerView p, final boolean mirror) {
         this.docID = id0;
-
         this.player = p;
-        if (p != null) { tab.setText(Localizer.getInstance().getMessage("lblPlayField", p.getName())); }
-        else { tab.setText(Localizer.getInstance().getMessage("lblNoPlayerForEDocID", docID.toString())); }
+        this.detailsPanel = new PlayerDetailsPanel(player, CMatchUI.FLOATING_ZONE_TYPES);
 
-        detailsPanel = new PlayerDetailsPanel(player, CMatchUI.FLOATING_ZONE_TYPES);
+        this.control = new CField(matchUI, player, this);
 
-        // TODO player is hard-coded into tabletop...should be dynamic
-        // (haven't looked into it too deeply). Doublestrike 12-04-12
-        tabletop = new PlayArea(matchUI, scroller, mirror, player, ZoneType.Battlefield);
+        this.avatarArea = new AvatarArea(player, () -> control.getMatchUI().isHighlighted(player));
 
-        control = new CField(matchUI, player, this);
+        this.tabletop = new PlayArea(matchUI, scroller, mirror, player, ZoneType.Battlefield);
+        this.tabletop.setBorder(new FSkin.MatteSkinBorder(0, 1, 0, 0, FSkin.getColor(FSkin.Colors.CLR_BORDERS)));
+        this.tabletop.setOpaque(false);
 
-        lblAvatar.setFocusable(false);
-        lblLife.setFocusable(false);
-        lblPoison.setFocusable(false);
-        lblEnergy.setFocusable(false);
-        lblExperience.setFocusable(false);
-        lblTicket.setFocusable(false);
-        lblRad.setFocusable(false);
-
-        avatarArea.setOpaque(false);
-        avatarArea.setBackground(FSkin.getColor(FSkin.Colors.CLR_HOVER));
-        avatarArea.setLayout(new MigLayout("insets 0, gap 0"));
-        avatarArea.add(lblAvatar, "w 100%-6px!, h 100%-23px!, wrap, gap 3 3 3 0");
-        avatarArea.add(lblLife, "w 100%!, h 20px!, wrap");
-
-        // Player area hover effect
-        avatarArea.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(final MouseEvent e) {
-                avatarArea.setOpaque(true);
-                if (!isHighlighted()) {
-                    avatarArea.setBorder(new FSkin.LineSkinBorder(FSkin.getColor(FSkin.Colors.CLR_BORDERS)));
-                }
-            }
-
-            @Override
-            public void mouseExited(final MouseEvent e) {
-                avatarArea.setOpaque(false);
-                if (!isHighlighted()) {
-                    avatarArea.setBorder(borderAvatarSimple);
-                }
-            }
-        });
-
-        tabletop.setBorder(new FSkin.MatteSkinBorder(0, 1, 0, 0, FSkin.getColor(FSkin.Colors.CLR_BORDERS)));
-        tabletop.setOpaque(false);
-
-        scroller.setViewportView(this.tabletop);
-
-        updateDetails();
+        this.scroller.setViewportView(this.tabletop);
+        assignTabText();
     }
 
+    private void assignTabText() {
+        if (player != null) {
+            tab.setText(localize().getMessage("lblPlayField", player.getName()));
+        } else {
+            tab.setText(localize().getMessage("lblNoPlayerForEDocID", docID.toString()));
+        }
+    }
+
+    // Client Update Methods
+    
     @Override
     public void populate() {
         final JPanel pnl = parentCell.getBody();
@@ -161,6 +141,20 @@ public class VField implements IVDoc<CField> {
         pnl.add(scroller, "w 85%!, h 100%!, span 1 2, wrap");
         pnl.add(detailsPanel, "w 10%!, h 64%!, gapleft 1px");
     }
+
+    public void updateManaPool() {
+        detailsPanel.updateManaPool();
+    }
+
+    public void updateZones() {
+        detailsPanel.updateZones();
+    }
+
+    public void updateDetails() {
+        avatarArea.updateDetails();
+    }
+
+    // Accessors
 
     @Override
     public EDocID getDocumentID() {
@@ -203,194 +197,375 @@ public class VField implements IVDoc<CField> {
         return detailsPanel;
     }
 
-    private boolean isHighlighted() {
-        return control.getMatchUI().isHighlighted(player);
-    }
-
     public void setAvatar(final SkinImage avatar) {
-        lblAvatar.setIcon(avatar);
-        lblAvatar.getResizeTimer().start();
+        avatarArea.setAvatar(avatar);
     }
 
-    public void updateManaPool() {
-        detailsPanel.updateManaPool();
-    }
-    public void updateZones() {
-        detailsPanel.updateZones();
-    }
+    /**
+     * Manages display of Avatar and CounterDetails.
+     */
+    protected static class AvatarArea extends SkinnedPanel {
+        private final VCounterDisplayPanel counters;
+        private final FLabel lblAvatar = new FLabel.Builder().fontAlign(SwingConstants.CENTER)
+                                                             .iconScaleFactor(1.0f)
+                                                             .build();
+        private final BooleanSupplier highlightIndicator;
+        private final PlayerView player;
 
-    private void addLblTicket() {
-        if (lblTicket.isShowing() || lblExperience.isShowing() || lblEnergy.isShowing() || lblPoison.isShowing()) {
-            return; // experience, energy, poison take precedence
-        }
-        avatarArea.remove(lblLife);
-        lblLife.setIcon(FSkin.getImage(FSkinProp.ICO_QUEST_LIFE));
-        avatarArea.add(lblLife, "w 50%!, h 20px!, split 2");
-        avatarArea.add(lblTicket, "w 50%!, h 20px!, wrap");
-    }
+        private final Border borderAvatarSimple = new LineBorder(new Color(0, 0, 0, 0), 1);
+        private final Border borderAvatarHighlighted = new LineBorder(Color.red, 2);
 
-    private void removeLblTicket() {
-        if (!lblTicket.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblTicket);
-        avatarArea.remove(lblLife);
-        avatarArea.add(lblLife, "w 100%!, h 20px!, wrap");
-    }
+        public AvatarArea(PlayerView player, BooleanSupplier highlightIndicator) {
+            this.highlightIndicator = highlightIndicator;
+            this.player = player;
+            lblAvatar.setFocusable(false);
+            //lblAvatar.setText(player.getName());
+            setOpaque(false);
+            setBackground(FSkin.getColor(FSkin.Colors.CLR_HOVER));
+            counters = new VCounterDisplayPanel(player);
+            applyLayout();
+            // Player area hover effect
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(final MouseEvent e) {
+                    setOpaque(true);
+                    if (!isHighlighted()) {
+                        setBorder(new FSkin.LineSkinBorder(FSkin.getColor(FSkin.Colors.CLR_BORDERS)));
+                    }
+                }
 
-    private void addLblRad() {
-        if (lblRad.isShowing() || lblExperience.isShowing() || lblEnergy.isShowing() || lblPoison.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblLife);
-        lblLife.setIcon(FSkin.getImage(FSkinProp.ICO_QUEST_LIFE));
-        avatarArea.add(lblLife, "w 50%!, h 20px!, split 2");
-        avatarArea.add(lblRad, "w 50%!, h 20px!, wrap");
-    }
-
-    private void removeLblRad() {
-        if (!lblRad.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblRad);
-        avatarArea.remove(lblLife);
-        avatarArea.add(lblLife, "w 100%!, h 20px!, wrap");
-    }
-
-    private void addLblExperience() {
-        if (lblExperience.isShowing() || lblEnergy.isShowing() || lblPoison.isShowing()) {
-            return; // energy and poison take precedence
-        }
-        avatarArea.remove(lblLife);
-        lblLife.setIcon(FSkin.getImage(FSkinProp.ICO_QUEST_LIFE));
-        avatarArea.add(lblLife, "w 50%!, h 20px!, split 2");
-        avatarArea.add(lblExperience, "w 50%!, h 20px!, wrap");
-    }
-
-    private void removeLblExperience() {
-        if (!lblExperience.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblExperience);
-        avatarArea.remove(lblLife);
-        avatarArea.add(lblLife, "w 100%!, h 20px!, wrap");
-    }
-
-    private void addLblEnergy() {
-        if (lblEnergy.isShowing() || lblPoison.isShowing()) {
-            return; // poison takes precedence
-        }
-        avatarArea.remove(lblLife);
-        lblLife.setIcon(FSkin.getImage(FSkinProp.ICO_QUEST_LIFE));
-        avatarArea.add(lblLife, "w 50%!, h 20px!, split 2");
-        avatarArea.add(lblEnergy, "w 50%!, h 20px!, wrap");
-    }
-    
-    private void removeLblEnergy() {
-        if (!lblEnergy.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblEnergy);
-        avatarArea.remove(lblLife);
-        avatarArea.add(lblLife, "w 100%!, h 20px!, wrap");
-    }
-
-    private void addLblPoison() {
-        if (lblPoison.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblLife);
-        lblLife.setIcon(FSkin.getImage(FSkinProp.ICO_QUEST_LIFE));
-        avatarArea.add(lblLife, "w 50%!, h 20px!, split 2");
-        avatarArea.add(lblPoison, "w 50%!, h 20px!, wrap");
-    }
-    private void removeLblPoison() {
-        if (!lblPoison.isShowing()) {
-            return;
-        }
-        avatarArea.remove(lblPoison);
-        avatarArea.remove(lblLife);
-        avatarArea.add(lblLife, "w 100%!, h 20px!, wrap");
-    }
-
-    public void updateDetails() {
-        // Update life total
-        final int life = player.getLife();
-        lblLife.setText(String.valueOf(life));
-        if (life > LIFE_CRITICAL) {
-            lblLife.setForeground(FSkin.getColor(FSkin.Colors.CLR_TEXT));
-        } else {
-            lblLife.setForeground(Color.RED);
+                @Override
+                public void mouseExited(final MouseEvent e) {
+                    setOpaque(false);
+                    if (!isHighlighted()) {
+                        setBorder(borderAvatarSimple);
+                    }
+                }
+            });
         }
 
-        // Update poison and/or energy counters, poison counters take precedence
-        final int poison = player.getCounters(CounterEnumType.POISON);
-        final int energy = player.getCounters(CounterEnumType.ENERGY);
-        final int experience = player.getCounters(CounterEnumType.EXPERIENCE);
-        final int rad = player.getCounters(CounterEnumType.RAD);
-        final int ticket = player.getCounters(CounterEnumType.TICKET);
+        protected void applyLayout() {
+            setLayout(new MigLayout(
+                              new LC().insets("0").gridGap("0", "0").width("100%").wrapAfter(1),
+                              new AC().grow()
+                      )
+            );
+            //setLayout(new GridLayout(2, 1, 2, 2));
+            int rightPadding = 6;
+            int bottomPadding = 3;
+            //int spaceForCounterDetails = CounterDisplayPanel.PANEL_HEIGHT + bottomPadding;
 
-        if (poison > 0) {
-            removeLblEnergy();
-            removeLblExperience();
-            removeLblRad();
-            removeLblTicket();
-            addLblPoison();
-            lblPoison.setText(String.valueOf(poison));
-            if (poison < POISON_CRITICAL) {
-                lblPoison.setForeground(FSkin.getColor(FSkin.Colors.CLR_TEXT));
+            //add(lblAvatar, String.format("w 100%%-%spx!, h 100%%-%spx!, wrap, gap 3 3 3 0", rightPadding, spaceForCounterDetails));
+            //add(counters, String.format("w 100%%!, h %spx!, wrap", CounterDisplayPanel.PANEL_HEIGHT));
+            add(lblAvatar, new CC().grow().width("100%").height("100%-20px"));
+            add(counters, new CC().grow().width("100%").minHeight("20px").wrap());
+        }
+
+        protected void setAvatar(final SkinImage avatar) {
+            lblAvatar.setIcon(avatar);
+            lblAvatar.getResizeTimer().start();
+        }
+
+        protected boolean isHighlighted() {
+            return highlightIndicator.getAsBoolean();
+        }
+
+        public void updateDetails() {
+            counters.updateDetails();
+            final boolean highlighted = isHighlighted();
+            setBorder(highlighted ? borderAvatarHighlighted : borderAvatarSimple);
+            setOpaque(highlighted);
+            setToolTipText(player.getDetailsHtml());
+        }
+
+    }
+
+    public static class VCounterDisplayPanel extends JPanel {
+        protected final static int PANEL_HEIGHT = 20;
+
+        private final static int DEFAULT_VISIBLE_COUNTERS = 5; // Includes Life Total
+
+        private final PlayerView player;
+
+        protected List<CounterDisplay> prioritizedCounters = createPrioritizedCounterDisplays();
+
+        protected List<CounterDisplay> createPrioritizedCounterDisplays() {
+            List<CounterDisplay> cds = new LinkedList<>();
+            cds.add(new LifeCounterDisplay());
+            cds.add(new PoisonCounterDisplay());
+            cds.add(new EnergyCounterDisplay());
+            cds.add(new ExperienceCounterDisplay());
+            cds.add(new RadCounterDisplay());
+            cds.add(new TicketCounterDisplay());
+            return cds;
+        }
+
+        /**
+         * Constructor
+         *
+         * @param player &emsp; {@link PlayerView} providing counts for counters.
+         */
+        public VCounterDisplayPanel(PlayerView player) {
+            this.player = player;
+            setOpaque(false);
+            //setBackground(FSkin.getColor(FSkin.Colors.CLR_OVERLAY));
+            //setLayout(new MigLayout(
+            //        new LC().insets("0").gridGap("0", "0"),
+            //        new AC().grow())
+            //);
+            //setLayout(new FlowLayout(FlowLayout.CENTER, 2, 2));
+            setLayout(counterPanelLayout(1, 1))
+            setBorder(BorderFactory.createLineBorder(Color.yellow, 2));
+            addFirstItem();
+            setVisible(true);
+        }
+
+        protected void updateDetails() {
+            refresh(DEFAULT_VISIBLE_COUNTERS);
+        }
+
+        public VCounterDisplayPanel refresh(int visibleCountersAllowed) {
+            boolean hasAnythingChanged = updateCounters();
+            if (hasAnythingChanged) {
+                removeAll();
+                addNonZeroCounters(visibleCountersAllowed);
+            }
+            return this;
+        }
+
+        private boolean updateCounters() {
+            boolean isAnythingDifferent = false;
+            for (CounterDisplay cd : prioritizedCounters) {
+                boolean didCounterChange = cd.refresh(player);
+                if (didCounterChange) {
+                    cd.setVisible(cd::isNonZero);
+                }
+                isAnythingDifferent |= didCounterChange; // This becomes true only if a counter has changed.
+            }
+            return isAnythingDifferent;
+        }
+
+        private void addNonZeroCounters(int visibleCountersAllowed) {
+            int nonZeroCounters = countNonZeroCounterDisplays();
+            if (nonZeroCounters > 0) {
+                int visibleCounters = Math.max(Math.min(nonZeroCounters, visibleCountersAllowed), 1); // Life is always shown
+                //showInitialCounter(prioritizedCounters.getFirst(), visibleCounters);
+                prioritizedCounters.stream()
+                                   .filter(FLabel::isVisible)
+                                   .limit(visibleCounters)
+                                   .forEach(counter -> showCounter(counter, visibleCounters));
             } else {
-                lblPoison.setForeground(Color.RED);
+                //add(lblLife, String.format("w 100%%!, h %spx!, wrap", PANEL_HEIGHT));
+                addFirstItem();
             }
-        } else {
-            removeLblPoison();
         }
 
-        if (energy > 0) {
-            removeLblExperience();
-            removeLblRad();
-            removeLblTicket();
-            if (poison == 0) {
-                addLblEnergy();
-                lblEnergy.setText(String.valueOf(energy));
-            }
-        } else {
-            removeLblEnergy();
+        private void addFirstItem() {
+            CounterDisplay firstItem = prioritizedCounters.stream()
+                                                          .findFirst()
+                                                          .orElse(null);
+            add(firstItem, new CC().minWidth("20px"));
         }
 
-        if (experience > 0) {
-            removeLblRad();
-            removeLblTicket();
-            if (poison == 0 && energy == 0) {
-                addLblExperience();
-                lblExperience.setText(String.valueOf(experience));
-            }
-        } else {
-            removeLblExperience();
+        private int countNonZeroCounterDisplays() {
+            return Math.toIntExact(prioritizedCounters.stream()
+                                                      .filter(FLabel::isVisible)
+                                                      .count());
         }
 
-        if (rad > 0) {
-            removeLblTicket();
-            if (poison == 0 && energy == 0 && experience == 0) {
-                addLblRad();
-                lblRad.setText(String.valueOf(rad));
-            }
-        } else {
-            removeLblRad();
+        private void showCounter(FLabel counter, int visibleCounters) {
+            add(counter, new CC().minWidth("20px").hideMode(3));
         }
 
-        if (ticket > 0) {
-            if (poison == 0 && energy == 0 && experience == 0 && rad == 0) {
-                addLblTicket();
-                lblTicket.setText(String.valueOf(ticket));
-            }
-        } else {
-            removeLblTicket();
+        private void showInitialCounterOld(FLabel counter, int visibleCounters) {
+            add(counter, String.format("w %s%%!, h %spx!, split %s", 100 / visibleCounters, PANEL_HEIGHT, visibleCounters));
         }
 
-        final boolean highlighted = isHighlighted();
-        this.avatarArea.setBorder(highlighted ? borderAvatarHighlighted : borderAvatarSimple );
-        this.avatarArea.setOpaque(highlighted);
-        this.avatarArea.setToolTipText(player.getDetailsHtml());
+        private void showCounterOld(FLabel counter, int visibleCounters) {
+            add(counter, String.format("w %s%%!, h %spx!, wrap", 100 / visibleCounters, PANEL_HEIGHT));
+        }
+
+    }
+
+    public static abstract class CounterDisplay extends FLabel {
+        // Common defaults for all Counters
+        private static final FLabel.Builder LABEL_TEMPLATE = new FLabel.Builder()
+                .suppressFocusable(true)
+                .fontAlign(SwingConstants.RIGHT)
+                .fontStyle(Font.BOLD)
+                .iconInBackground();
+
+        private String name;
+
+        protected CounterEnumType type;
+        protected int count, previousCount = 0;
+
+        public CounterDisplay(String name, FSkinProp iconProp) {
+            super(LABEL_TEMPLATE.copy().iconImage(iconProp));
+            setIconTextGap(25);
+            setHorizontalAlignment(SwingConstants.CENTER);
+            setVerticalAlignment(SwingConstants.CENTER);
+            setVerticalTextPosition(SwingConstants.CENTER);
+            setHorizontalTextPosition(SwingConstants.TRAILING);
+            setBorder(BorderFactory.createLineBorder(Color.green, 1));
+            this.name = name;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        /**
+         * Refresh the count and update the label.
+         *
+         * @param player &emsp; {@link PlayerView} from which the count is derived.
+         * @return boolean &emsp; <code>true</code> if the count changed since the last invocation, <code>false</code> otherwise.
+         */
+        public boolean refresh(PlayerView player) {
+            count = retrieveCount(player);
+            if (count == previousCount) return false; // No need to do anything if the count did not change.
+
+            setText(String.valueOf(count));
+            updateCriticalIndicator();
+            previousCount = count;
+            return true;
+        }
+
+        protected int retrieveCount(PlayerView player) {
+            return player.getCounters(type);
+        }
+
+        public void setVisible(BooleanSupplier visibilityCondition) {
+            setVisible(visibilityCondition.getAsBoolean());
+        }
+
+        protected void updateCriticalIndicator() {
+            if (isCritical()) {
+                setForeground(Color.RED);
+            } else {
+                FSkin.SkinColor textColor = FSkin.getColor(forge.toolbox.FSkin.Colors.CLR_TEXT);
+                setForeground(textColor);
+            }
+        }
+
+        protected boolean isNonZero() {
+            return count > 0;
+        }
+
+        protected boolean isCritical() {
+            return false;
+        }
+    }
+
+    protected static class LifeCounterDisplay extends CounterDisplay {
+        private final static int LIFE_CRITICAL_THRESHOLD = 5;
+
+        public LifeCounterDisplay() {
+            super("Life", FSkinProp.ICO_QUEST_LIFE);
+        }
+
+        @Override
+        protected int retrieveCount(PlayerView player) {
+            return player.getLife();
+        }
+
+        @Override
+        protected boolean isCritical() {
+            return count < LIFE_CRITICAL_THRESHOLD;
+        }
+    }
+
+    protected static class PoisonCounterDisplay extends CounterDisplay {
+        private final static int POISON_CRITICAL_THRESHOLD = 8;
+
+        public PoisonCounterDisplay() {
+            super("Poison", FSkinProp.IMG_POISON);
+            this.type = CounterEnumType.POISON;
+        }
+
+        @Override
+        protected boolean isCritical() {
+            return count > POISON_CRITICAL_THRESHOLD;
+        }
+    }
+
+    protected static class EnergyCounterDisplay extends CounterDisplay {
+        public EnergyCounterDisplay() {
+            super("Energy", FSkinProp.IMG_ENERGY);
+            this.type = CounterEnumType.ENERGY;
+        }
+    }
+
+    protected static class ExperienceCounterDisplay extends CounterDisplay {
+        public ExperienceCounterDisplay() {
+            super("Experience", FSkinProp.IMG_EXPERIENCE);
+            this.type = CounterEnumType.EXPERIENCE;
+        }
+    }
+
+    protected static class TicketCounterDisplay extends CounterDisplay {
+        public TicketCounterDisplay() {
+            super("Ticket", FSkinProp.IMG_TICKET);
+            this.type = CounterEnumType.TICKET;
+        }
+    }
+
+    protected static class RadCounterDisplay extends CounterDisplay {
+        public RadCounterDisplay() {
+            super("Rad", FSkinProp.IMG_RAD);
+            this.type = CounterEnumType.RAD;
+        }
+    }
+
+
+    private static LayoutManager topLevelLayout() {
+        LC lc = new LC()
+                .fill();
+        if (DEBUG_RATE[0] > 0) {
+            lc.debug(DEBUG_RATE[0]);
+        }
+        return new MigLayout(lc);
+    }
+
+    private static LayoutManager counterPanelLayout(int wrapAfter, int visibleCount) {
+        int displayedCount = Math.max(Math.min(wrapAfter, visibleCount), 1);
+        log.info("CounterPanelLayout displayedCount: {}", displayedCount);
+        LC lc = new LC()
+                .flowX()
+                .wrapAfter(displayedCount);
+        if (DEBUG_RATE[0] > 0) {
+            lc.debug(DEBUG_RATE[0]);
+        }
+        return new MigLayout(lc);
+        //return new FlowLayout(FlowLayout.CENTER, DEFAULT_TEXT_GAP, DEFAULT_TEXT_GAP / 2);
+    }
+
+    private static CC logoCc() {
+        return new CC()
+                .maxHeight(String.valueOf(AVATAR_DEFAULT_HEIGHT))
+                //.minHeight(String.valueOf(AVATAR_MIN_HEIGHT))
+                .width(String.valueOf(AVATAR_DEFAULT_WIDTH))
+                .height(String.valueOf(AVATAR_DEFAULT_HEIGHT))
+                .grow()
+                ;
+    }
+
+    private static CC panelCc() {
+        return new CC()
+                .minHeight(String.valueOf(HEIGHT))
+                .maxHeight(String.valueOf(HEIGHT))
+                .minWidth(String.valueOf(COUNTER_PANEL_MIN_WIDTH))
+                .width(String.valueOf(COUNTER_PANEL_DEFAULT_WIDTH))
+                .height(String.valueOf(HEIGHT))
+                .dockSouth()
+                ;
+    }
+
+    private static CC counterCc() {
+        return new CC()
+                .growX()
+                .push()
+                .hideMode(3)
+                ;
     }
 }
