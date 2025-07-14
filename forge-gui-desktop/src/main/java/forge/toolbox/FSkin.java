@@ -17,91 +17,6 @@
  */
 package forge.toolbox;
 
-import java.awt.AlphaComposite;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Composite;
-import java.awt.Cursor;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Frame;
-import java.awt.GradientPaint;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Image;
-import java.awt.LayoutManager;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
-import java.awt.Toolkit;
-import java.awt.Window;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-//import java.awt.image.BaseMultiResolutionImage;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Vector;
-
-import javax.imageio.ImageIO;
-import javax.swing.AbstractButton;
-import javax.swing.Action;
-import javax.swing.BorderFactory;
-import javax.swing.ComboBoxModel;
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.InputMap;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JCheckBoxMenuItem;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JDialog;
-import javax.swing.JEditorPane;
-import javax.swing.JFormattedTextField;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JLayeredPane;
-import javax.swing.JList;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPasswordField;
-import javax.swing.JRadioButton;
-import javax.swing.JRadioButtonMenuItem;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
-import javax.swing.JSlider;
-import javax.swing.JSpinner;
-import javax.swing.JTabbedPane;
-import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.KeyStroke;
-import javax.swing.ListModel;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
-import javax.swing.border.Border;
-import javax.swing.border.LineBorder;
-import javax.swing.border.TitledBorder;
-import javax.swing.plaf.basic.BasicScrollBarUI;
-import javax.swing.table.JTableHeader;
-import javax.swing.table.TableColumnModel;
-import javax.swing.text.DefaultEditorKit;
-import javax.swing.text.JTextComponent;
-
 import forge.Singletons;
 import forge.gui.FThreads;
 import forge.gui.GuiUtils;
@@ -116,6 +31,22 @@ import forge.util.Localizer;
 import forge.util.OperatingSystem;
 import forge.util.WordUtil;
 import forge.view.FView;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.*;
+import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.util.*;
+import java.util.List;
+import java.util.Map.Entry;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import javax.swing.border.*;
+import javax.swing.plaf.basic.*;
+import javax.swing.table.*;
+import javax.swing.text.*;
 
 
 /**
@@ -2167,6 +2098,9 @@ public class FSkin {
         public void setBorder(final SkinBorder skinBorder) { getSkin().setBorder(this, skinBorder); }
         @Override public void setBorder(final Border border) { getSkin().resetBorder(); super.setBorder(border); }
 
+        public void setIcon(final FSkinProp skinProp) {
+            getSkin().setIcon(this, getImage(skinProp));
+        }
         public void setIcon(final SkinImage skinImage) { getSkin().setIcon(this, skinImage); }
         @Override public void setIcon(final Icon icon) { getSkin().resetIcon(); super.setIcon(icon); }
 

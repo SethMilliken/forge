@@ -1,33 +1,5 @@
 package forge.toolbox;
 
-import java.awt.AlphaComposite;
-import java.awt.Color;
-import java.awt.Composite;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Image;
-import java.awt.Point;
-import java.awt.RenderingHints;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
-
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.SwingConstants;
-import javax.swing.Timer;
-import javax.swing.event.AncestorEvent;
-import javax.swing.event.AncestorListener;
-
 import forge.gui.UiCommand;
 import forge.gui.framework.ILocalRepaint;
 import forge.gui.interfaces.IButton;
@@ -37,153 +9,373 @@ import forge.toolbox.FSkin.SkinColor;
 import forge.toolbox.FSkin.SkinImage;
 import forge.toolbox.FSkin.SkinnedLabel;
 
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Objects;
+import javax.swing.*;
+import javax.swing.event.*;
+
 /**
- * Uses the Builder pattern to facilitate/encourage inline styling.
- * Credit to Effective Java 2 (Joshua Bloch).
- * Methods in builder can be chained. To declare:
- * <code>new FLabel.Builder().method1(foo).method2(bar).method3(baz)...</code>
- * <br>and then call build() to make the label (don't forget that part).
- * <br><br>
- * Adjustable features of FLabel:<br>
- * - Automatic font scaling (60% size by default, can toggle on/off)<br>
- * - Automatic icon scaling (80% size by default, can toggle on/off)<br>
- * - Scale font according to height or width<br>
- * - Hoverable<br>
- * - Selectable<br>
- * - Can execute command when clicked
+ * {@link FLabel} is a skinnable {@link javax.swing.JLabel} <code>Component</code>that serves as
+ * a fundamental building-block in the Forge desktop GUI.
+ *
+ * <p>Adjustable features:
+ * <ul>
+ *   <li>Automatic font scaling (60% size by default, can toggle on/off)
+ *   <li>Automatic icon scaling (80% size by default, can toggle on/off)
+ *   <li>Scale font according to height or width
+ *   <li>Hoverable
+ *   <li>Selectable
+ *   <li>Can execute a command when clicked
+ * </ul>
+ *
+ * @implNote {@link FLabel} instances <i>must</i> be created using an {@link FLabel.Builder}.
  */
 @SuppressWarnings("serial")
 public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
     /**
-     * Uses the Builder pattern to facilitate/encourage inline styling.
-     * Credit to Effective Java 2 (Joshua Bloch).
-     * Methods in builder can be chained. To declare:
-     * <code>new FLabel.Builder().method1(foo).method2(bar).method3(baz)...</code>
-     * <br>and then call build() to make the label (don't forget that part).
+     * {@link FLabel} instances <i>must</i> be created using a <code>Builder</code>.
+     *
+     * <p><code>build()</code> <i>must</i> be called on a <code>Builder</code>
+     * to produce a new {@link FLabel} instance.
+     *
+     * <p>Builder uses a fluent API, allowing methods to be chained.
+     *
+     * <p>Example:
+     * <pre><code>
+     * FLabel instance = new FLabel.Builder()
+     *                             .selectable(false)
+     *                             .iconAlign(SwingConstants.RIGHT)
+     *                             .opaque(true)
+     *                             .build();
+     * }
+     * </code></pre>
+     *
+     * @see "<i>Effective Java, 3rd Edition</i>", Bloch, Joshua.
+     * Chapter 2. Creating and Destroying Objects,
+     * Item 2: Consider a builder when faced with many constructor parameters
      */
     public static class Builder {
-        //========== Default values for FLabel are set here.
-        private double      bldIconScaleFactor  = 0.8;
-        private int         bldFontStyle        = Font.PLAIN;
-        private int         bldFontSize         = 14;
-        private float       bldUnhoveredAlpha   = 0.7f;
-        private int         bldIconAlignX       = SwingConstants.LEFT;
-        private final Point bldIconInsets       = new Point(0, 0);
+        // Set FLabel default values here.
+        protected double bldIconScaleFactor = 0.8;
+        protected int bldFontStyle = Font.PLAIN;
+        protected int bldFontSize = 14;
+        protected int bldFontAlign = SwingConstants.LEFT;
+        protected float bldUnhoveredAlpha = 0.7f;
+        protected int bldIconAlignX = SwingConstants.LEFT;
+        protected Point bldIconInsets = new Point(0, 0);
 
-        private boolean bldSelectable         = false;
-        private boolean bldSelected           = false;
-        protected boolean bldHoverable        = false;
-        protected boolean bldOpaque           = false;
-        private boolean bldIconInBackground   = false;
-        private boolean bldIconScaleAuto      = true;
+        protected boolean bldSelectable = false;
+        protected boolean bldSelected = false;
+        protected boolean bldHoverable = false;
+        protected boolean bldOpaque = false;
+        protected boolean bldIconInBackground = false;
+        protected boolean bldIconScaleAuto = true;
         protected boolean bldReactOnMouseDown = false;
-        private boolean bldUseSkinColors      = true;
-        private boolean bldEnabled            = true;
+        protected boolean bldUseSkinColors = true;
+        protected boolean bldEnabled = true;
+        protected boolean bldSuppressFocusable = false;
 
-        protected String  bldText, bldToolTip;
-        private SkinImage bldIcon;
-        private int bldFontAlign;
+        protected String bldText;
+        protected String bldToolTip;
+        protected SkinImage bldIcon;
         protected UiCommand bldCmd;
 
-        // Build!
-        /** @return {@link forge.toolbox.FLabel} */
-        public FLabel build() { return new FLabel(this); }
+        public Builder copy() {
+            Builder copy = new Builder();
+            copy.bldIconScaleFactor = this.bldIconScaleFactor;
+            copy.bldFontStyle = this.bldFontStyle;
+            copy.bldFontSize = this.bldFontSize;
+            copy.bldFontAlign = this.bldFontAlign;
+            copy.bldUnhoveredAlpha = this.bldUnhoveredAlpha;
+            copy.bldIconAlignX = this.bldIconAlignX;
+            copy.bldIconInsets = this.bldIconInsets;
+            copy.bldSelectable = this.bldSelectable;
+            copy.bldSelected = this.bldSelected;
+            copy.bldHoverable = this.bldHoverable;
+            copy.bldOpaque = this.bldOpaque;
+            copy.bldIconInBackground = this.bldIconInBackground;
+            copy.bldIconScaleAuto = this.bldIconScaleAuto;
+            copy.bldReactOnMouseDown = this.bldReactOnMouseDown;
+            copy.bldUseSkinColors = this.bldUseSkinColors;
+            copy.bldEnabled = this.bldEnabled;
+            copy.bldSuppressFocusable = this.bldSuppressFocusable;
+            copy.bldText = this.bldText;
+            copy.bldToolTip = this.bldToolTip;
+            copy.bldIcon = this.bldIcon;
+            copy.bldCmd = this.bldCmd;
+            return copy;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Builder builder)) return false;
+            return Double.compare(bldIconScaleFactor, builder.bldIconScaleFactor) == 0 && bldFontStyle == builder.bldFontStyle && bldFontSize == builder.bldFontSize && bldFontAlign == builder.bldFontAlign && Float.compare(bldUnhoveredAlpha, builder.bldUnhoveredAlpha) == 0 && bldIconAlignX == builder.bldIconAlignX && bldSelectable == builder.bldSelectable && bldSelected == builder.bldSelected && bldHoverable == builder.bldHoverable && bldOpaque == builder.bldOpaque && bldIconInBackground == builder.bldIconInBackground && bldIconScaleAuto == builder.bldIconScaleAuto && bldReactOnMouseDown == builder.bldReactOnMouseDown && bldUseSkinColors == builder.bldUseSkinColors && bldEnabled == builder.bldEnabled && bldSuppressFocusable == builder.bldSuppressFocusable && Objects.equals(bldIconInsets, builder.bldIconInsets) && Objects.equals(bldText, builder.bldText) && Objects.equals(bldToolTip, builder.bldToolTip) && Objects.equals(bldIcon, builder.bldIcon) && Objects.equals(bldCmd, builder.bldCmd);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(bldIconScaleFactor, bldFontStyle, bldFontSize, bldFontAlign, bldUnhoveredAlpha, bldIconAlignX, bldIconInsets, bldSelectable, bldSelected, bldHoverable, bldOpaque, bldIconInBackground, bldIconScaleAuto, bldReactOnMouseDown, bldUseSkinColors, bldEnabled, bldSuppressFocusable, bldText, bldToolTip, bldIcon, bldCmd);
+        }
+
+        /**
+         * Instantiates an {@link forge.toolbox.FLabel} using the values of the <code>Builder</code>.
+         * @return {@link forge.toolbox.FLabel}
+         */
+        public FLabel build() {
+            return new FLabel(this);
+        }
 
         // Begin builder methods.
-        /**@param s0 &emsp; {@link java.lang.String}
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder text(final String s0) { this.bldText = s0; return this; }
 
-        /**@param s0 &emsp; {@link java.lang.String}
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder tooltip(final String s0) { this.bldToolTip = s0; return this; }
+        /**
+         * @param s0 &emsp; {@link java.lang.String}
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder text(final String s0) {
+            this.bldText = s0;
+            return this;
+        }
 
-        /**@param i0 &emsp; {@link forge.toolbox.FSkin.SkinIcon}
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder icon(final SkinImage i0) { this.bldIcon = i0; return this; }
+        /**
+         * @param s0 &emsp; {@link java.lang.String}
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder tooltip(final String s0) {
+            this.bldToolTip = s0;
+            return this;
+        }
 
-        /**@param i0 &emsp; SwingConstants.CENTER, .LEFT, or .RIGHT
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder fontAlign(final int i0) { this.bldFontAlign = i0; return this; }
+        /**
+         * @param i0 &emsp; {@link forge.toolbox.FSkin.SkinIcon}
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder icon(final SkinImage i0) {
+            this.bldIcon = i0;
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder opaque(final boolean b0) { this.bldOpaque = b0; return this; }
-        public Builder opaque() { opaque(true); return this; }
+        /**
+         * Convenience method to wrap a commonly used pattern.
+         *
+         * @param prop &emsp; {@link FSkinProp} for which to get image
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder iconImage(final FSkinProp prop) {
+            this.bldIcon = FSkin.getImage(prop);
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder hoverable(final boolean b0) { this.bldHoverable = b0; return this; }
-        public Builder hoverable() { hoverable(true); return this; }
+        /**
+         * @param i0 &emsp; SwingConstants.CENTER, .LEFT, or .RIGHT
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder fontAlign(final int i0) {
+            if (i0 != SwingConstants.CENTER && i0 != SwingConstants.LEFT && i0 != SwingConstants.RIGHT) {
+                throw new IllegalArgumentException(String.format("FLabel.Builder$fontAlign must be SwingConstants.CENTER, SwingConstants.LEFT, or SwingConstants.RIGHT: %s", i0));
+            }
+            this.bldFontAlign = i0;
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder selectable(final boolean b0) { this.bldSelectable = b0; return this; }
-        public Builder selectable() { selectable(true); return this; }
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder opaque(final boolean b0) {
+            this.bldOpaque = b0;
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder selected(final boolean b0) { this.bldSelected = b0; return this; }
-        public Builder selected() { selected(true); return this; }
+        public Builder opaque() {
+            opaque(true);
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean that controls when the label responds to mouse events
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder reactOnMouseDown(final boolean b0) { this.bldReactOnMouseDown = b0; return this; }
-        public Builder reactOnMouseDown() { reactOnMouseDown(true); return this; }
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder hoverable(final boolean b0) {
+            this.bldHoverable = b0;
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean that controls whether the text uses skin colors
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder useSkinColors(final boolean b0) { bldUseSkinColors = b0; return this; }
+        public Builder hoverable() {
+            hoverable(true);
+            return this;
+        }
 
-        /**@param c0 &emsp; {@link forge.forge.gui.UiCommand} to execute if clicked
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder cmdClick(final UiCommand c0) { this.bldCmd = c0; return this; }
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder selectable(final boolean b0) {
+            this.bldSelectable = b0;
+            return this;
+        }
 
-        /**@param i0 &emsp; int
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder fontSize(final int i0) { this.bldFontSize = i0; return this; }
+        public Builder selectable() {
+            selectable(true);
+            return this;
+        }
 
-        /**@param i0 &emsp; Font.PLAIN, Font.BOLD, or Font.ITALIC
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder fontStyle(final int i0) { this.bldFontStyle = i0; return this; }
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder selected(final boolean b0) {
+            this.bldSelected = b0;
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder enabled(final boolean b0) { this.bldEnabled = b0; return this; }
+        public Builder selected() {
+            selected(true);
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder iconScaleAuto(final boolean b0) { this.bldIconScaleAuto = b0; return this; }
+        /**
+         * @param b0 &emsp; boolean that controls when the label responds to mouse events
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder reactOnMouseDown(final boolean b0) {
+            this.bldReactOnMouseDown = b0;
+            return this;
+        }
 
-        /**@param d0 &emsp; double between 0 and 1, 0.8 by default
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder iconScaleFactor(final double d0) { this.bldIconScaleFactor = d0; return this; }
+        public Builder reactOnMouseDown() {
+            reactOnMouseDown(true);
+            return this;
+        }
 
-        /**@param b0 &emsp; boolean, icon will be drawn independent of text
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder iconInBackground(final boolean b0) { this.bldIconInBackground = b0; return this; }
-        public Builder iconInBackground() { iconInBackground(true); return this; }
+        /**
+         * @param b0 &emsp; boolean that controls whether the text uses skin colors
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder useSkinColors(final boolean b0) {
+            bldUseSkinColors = b0;
+            return this;
+        }
 
-        /**@param f0 &emsp; 0.0f - 1.0f. alpha factor applied when label is hoverable but not currently hovered.
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder unhoveredAlpha(final float f0) { this.bldUnhoveredAlpha = f0; return this; }
+        /**
+         * @param c0 &emsp; {@link forge.gui.UiCommand} to execute if clicked
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder cmdClick(final UiCommand c0) {
+            this.bldCmd = c0;
+            return this;
+        }
 
-        /**@param i0 &emsp; Int. Only available for background icon.
-         * SwingConstants.HORIZONTAL .VERTICAL or .CENTER
-         * @return {@link forge.toolbox.FLabel.Builder} */
-        public Builder iconAlignX(final int i0) { this.bldIconAlignX = i0; return this; }
+        /**
+         * @param i0 &emsp; int
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder fontSize(final int i0) {
+            this.bldFontSize = i0;
+            return this;
+        }
+
+        /**
+         * @param i0 &emsp; Font.PLAIN, Font.BOLD, or Font.ITALIC
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder fontStyle(final int i0) {
+            if (i0 != Font.PLAIN && i0 != Font.BOLD && i0 != Font.ITALIC) {
+                throw new IllegalArgumentException(String.format("FLabel.Builder$fontStyle must be Font.PLAIN, Font.BOLD, or Font.ITALIC: %s", i0));
+            }
+            this.bldFontStyle = i0;
+            return this;
+        }
+
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder enabled(final boolean b0) {
+            this.bldEnabled = b0;
+            return this;
+        }
+
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder suppressFocusable(final boolean b0) {
+            this.bldSuppressFocusable = b0;
+            return this;
+        }
+
+        /**
+         * @param b0 &emsp; boolean
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder iconScaleAuto(final boolean b0) {
+            this.bldIconScaleAuto = b0;
+            return this;
+        }
+
+        /**
+         * @param d0 &emsp; double between 0 and 1; 0.8 by default
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder iconScaleFactor(final double d0) {
+            if (d0 < 0.0 || d0 > 1.0) {
+                throw new IllegalArgumentException(String.format("FLabel.Builder$iconScaleFactor must be between 0.0 and 1.0: %s", d0));
+            }
+            this.bldIconScaleFactor = d0;
+            return this;
+        }
+
+        /**
+         * @param b0 &emsp; boolean, icon will be drawn independent of text
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder iconInBackground(final boolean b0) {
+            this.bldIconInBackground = b0;
+            return this;
+        }
+
+        public Builder iconInBackground() {
+            iconInBackground(true);
+            return this;
+        }
+
+        /**
+         * @param f0 &emsp; 0.0f - 1.0f. alpha factor applied when label is hoverable but not currently hovered.
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder unhoveredAlpha(final float f0) {
+            if (f0 < 0.0f || f0 > 1.0f) {
+                throw new IllegalArgumentException(String.format("FLabel.Builder$iconScaleFactor must be between 0.0f and 1.0f: %s", f0));
+            }
+            this.bldUnhoveredAlpha = f0;
+            return this;
+        }
+
+        /**
+         * @param i0 &emsp; Int. Only available for background icon.
+         *           SwingConstants.HORIZONTAL .VERTICAL or .CENTER
+         * @return {@link forge.toolbox.FLabel.Builder}
+         */
+        public Builder iconAlignX(final int i0) {
+            this.bldIconAlignX = i0;
+            return this;
+        }
     }
 
     // sets better defaults for button labels
     public static class ButtonBuilder extends Builder {
         public ButtonBuilder() {
-            bldHoverable = true;
-            bldOpaque    = true;
+            hoverable(true);
+            opaque(true);
         }
     }
 
     //========== Constructors
-    // Call this using FLabel.Builder()...
+
+    /**
+     * @implNote Must be called <i>only</i> by {@link FLabel.Builder}.
+     */
     protected FLabel(final Builder b0) {
         super(b0.bldText);
 
@@ -197,35 +389,46 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         this.selected = b0.bldSelected;
         this.iconAlignX = b0.bldIconAlignX;
         this.iconInsets = b0.bldIconInsets;
+        this.fontStyle = b0.bldFontStyle;
 
         this.setEnabled(b0.bldEnabled);
-        this.setFontStyle(b0.bldFontStyle);
         this.setFontSize(b0.bldFontSize);
         this.setUnhoveredAlpha(b0.bldUnhoveredAlpha);
         this.setCommand(b0.bldCmd);
         this.setReactOnMouseDown(b0.bldReactOnMouseDown);
-        this.setFontAlign(b0.bldFontAlign);
+        this.setHorizontalAlignment(b0.bldFontAlign);
         this.setToolTipText(b0.bldToolTip);
         this.setHoverable(b0.bldHoverable);
 
-        // Call this last; to allow the properties which affect icons to already be in place.
+        // Set this only after setting all other properties that affect the icon.
         this.setIcon(b0.bldIcon);
 
         // If the label has button-like properties, interpret keypresses like a button
-        if (b0.bldSelectable || b0.bldHoverable) {
+        if (!b0.bldSuppressFocusable || b0.bldSelectable || b0.bldHoverable) {
             this.setFocusable(true);
 
             this.addKeyListener(new KeyAdapter() {
                 @Override
                 public void keyPressed(final KeyEvent e) {
-                    if (e.getKeyChar() == ' ' || e.getKeyCode() == 10 || e.getKeyCode() == KeyEvent.VK_ENTER) { _doMouseAction(); }
+                    if (e.getKeyChar() == ' ' || e.getKeyCode() == 10 || e.getKeyCode() == KeyEvent.VK_ENTER) {
+                        _doMouseAction();
+                    }
                 }
             });
 
             this.addFocusListener(new FocusListener() {
-                @Override public void focusLost(final FocusEvent arg0)   { repaintSelf(); }
-                @Override public void focusGained(final FocusEvent arg0) { repaintSelf(); }
+                @Override
+                public void focusLost(final FocusEvent arg0) {
+                    repaintSelf();
+                }
+
+                @Override
+                public void focusGained(final FocusEvent arg0) {
+                    repaintSelf();
+                }
             });
+        } else {
+            this.setFocusable(false);
         }
 
         if (b0.bldUseSkinColors) {
@@ -283,7 +486,10 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
 
     private final ActionListener fireResize = new ActionListener() {
         @Override
-        public void actionPerformed(final ActionEvent evt) { resetIcon(); resizeTimer.stop(); }
+        public void actionPerformed(final ActionEvent evt) {
+            resetIcon();
+            resizeTimer.stop();
+        }
     };
 
     private final Timer resizeTimer = new Timer(10, fireResize);
@@ -291,7 +497,9 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
     // Resize adapter; on a timer to prevent resizing while "sliding" between sizes
     private final ComponentAdapter cadResize = new ComponentAdapter() {
         @Override
-        public void componentResized(final ComponentEvent e) { resizeTimer.restart(); }
+        public void componentResized(final ComponentEvent e) {
+            resizeTimer.restart();
+        }
     };
 
     private final AncestorListener showFirstTime = new AncestorListener() {
@@ -361,8 +569,11 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
     };
 
     //========== Methods
-    /** @param b0 &emsp; boolean */
-    // Must be public.
+
+    /**
+     * @param b0 &emsp; boolean
+     * @implNote Must be public.
+     */
     @Override
     public void setEnabled(final boolean b0) {
         if (this.isEnabled() == b0) { return; }
@@ -372,8 +583,10 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         else { this.addMouseListener(madEvents); }
     }
 
-    /** @param b0 &emsp; boolean */
-    // Must be public.
+    /**
+     * @param b0 &emsp; boolean
+     * @implNote Must be public.
+     */
     public void setHoverable(final boolean b0) {
         if (this.hoverable == b0) { return; }
         this.hoverable = b0;
@@ -392,8 +605,10 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         repaintSelf();
     }
 
-    /** @param b0 &emsp; boolean */
-    // Must be public.
+    /**
+     * @param b0 &emsp; boolean
+     * @implNote Must be public.
+     */
     @Override
     public void setSelected(final boolean b0) {
         this.selected = b0;
@@ -405,41 +620,28 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         return this.selected;
     }
 
-    /** Sets alpha if icon is in background.
-     * @param f0 &emsp; float */
-    // NOT public; must be set when label is built.
+    /**
+     * Sets alpha if icon is in background.
+     *
+     * @param f0 float
+     * @implNote Must be called <i>only</i> when initially instantiated.
+     */
     private void setUnhoveredAlpha(final float f0) {
         this.alphaDim = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, f0);
         this.alphaStrong = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f);
     }
 
     public void setFontSize(final int i0) {
-        switch(this.fontStyle) {
-        case Font.BOLD: this.setFont(FSkin.getBoldFont(i0)); break;
-        case Font.ITALIC: this.setFont(FSkin.getItalicFont(i0)); break;
-        default: this.setFont(FSkin.getFont(i0));
+        switch (this.fontStyle) {
+            case Font.BOLD:
+                this.setFont(FSkin.getBoldFont(i0));
+                break;
+            case Font.ITALIC:
+                this.setFont(FSkin.getItalicFont(i0));
+                break;
+            default:
+                this.setFont(FSkin.getFont(i0));
         }
-    }
-
-    /** @param i0 &emsp; Font.PLAIN, .BOLD, or .ITALIC */
-    // NOT public; must be set when label is built.
-    public void setFontStyle(final int i0) {
-        if (i0 != Font.PLAIN && i0 != Font.BOLD && i0 != Font.ITALIC) {
-            throw new IllegalArgumentException("FLabel$setFontStyle "
-                    + "must be passed either Font.PLAIN, Font.BOLD, or Font.ITALIC.");
-        }
-        this.fontStyle = i0;
-    }
-
-    /** @param i0 &emsp; SwingConstants.CENTER, .LEFT or .RIGHT */
-    // NOT public; must be set when label is built.
-    public void setFontAlign(final int i0) {
-        if (i0 != SwingConstants.CENTER && i0 != SwingConstants.LEFT && i0 != SwingConstants.RIGHT) {
-            throw new IllegalArgumentException("FLabel$setFontStyle "
-                    + "must be passed either SwingConstants.CENTER, "
-                    + "SwingConstants.LEFT, or SwingConstants.RIGHT");
-        }
-        this.setHorizontalAlignment(i0);
     }
 
     public int getAutoSizeWidth() {
@@ -457,23 +659,27 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         return width;
     }
 
-    /** Resizing in MigLayout "slides" between the original and destination sizes.
+    /**
+     * Resizing in MigLayout "slides" between the original and destination sizes.
      * To prevent this label from recalculating on each increment, a timer
-     * is run to check that the the "sliding" is finished.  To resize this label
-     * explicitly, retrieve this timer and start it.  It will stop automatically.
-     *
-     * @return {@link javax.swing.Timer}
+     * is run to check that the "sliding" is finished.  To resize this label
+     * explicitly, call this method after resize to retrieve the timer and start it;
+     * it will stop automatically.
      */
-    public Timer getResizeTimer() {
-        return this.resizeTimer;
+    public void refresh() {
+        this.resizeTimer.start();
     }
 
-    /** @return {@link forge.forge.gui.UiCommand} */
-    public Runnable getCommand() {
+    /**
+     * @return {@link forge.gui.UiCommand}
+     */
+public Runnable getCommand() {
         return this.cmdClick;
     }
 
-    /** @return {@link forge.forge.gui.UiCommand} */
+    /**
+     * @return {@link forge.gui.UiCommand}
+     */
     public Runnable getRightClickCommand() {
         return this.cmdRightClick;
     }
@@ -487,7 +693,7 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
     }
 
     @Override
-    // Must be public.
+    /** @implNote Must be public */
     public void setIcon(final Icon i0) {
         // Will need image (not icon) for scaled and non-scaled.
         // Will need image if not in background, but scaled.
@@ -497,25 +703,27 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
                 iw = img.getWidth(null);
                 ih = img.getHeight(null);
                 iar = ((double) iw) / ((double) ih);
-            }
-            else {
+            } else {
                 img = null;
                 iw = 0;
                 ih = 0;
                 iar = 0;
             }
-        }
-        else { // If not in background, not scaled, can use original icon.
+        } else { // If not in background, not scaled, can use original icon.
             super.setIcon(i0);
         }
     }
 
-    /** @param c0 &emsp; {@link forge.forge.gui.UiCommand} on click */
+    /**
+     * @param c0 &emsp; {@link forge.gui.UiCommand} on click
+     */
     public void setCommand(final Runnable c0) {
         this.cmdClick = c0;
     }
 
-    /** @param c0 &emsp; {@link forge.forge.gui.UiCommand} on right-click */
+    /**
+     * @param c0 &emsp; {@link forge.gui.UiCommand} on right-click
+     */
     public void setRightClickCommand(final Runnable c0) {
         this.cmdRightClick = c0;
     }
@@ -531,7 +739,9 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         super.setOpaque(false);
     }
 
-    /** Major performance kicker - won't repaint whole screen! */
+    /**
+     * Major performance kicker - won't repaint whole screen!
+     */
     @Override
     public void repaintSelf() {
         final Dimension d = getSize();
@@ -554,20 +764,16 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
         final boolean paintPressedState = pressed && hovered && isEnabled() && (opaque || selectable);
         if (paintPressedState) {
             paintPressed(g2d, w, h);
-        }
-        else if (opaque) {
+        } else if (opaque) {
             if (selected) {
                 paintDown(g2d, w, h);
-            }
-            else {
+            } else {
                 paintUp(g2d, w, h);
             }
-        }
-        else if (selectable) {
+        } else if (selectable) {
             if (selected) {
                 paintDown(g2d, w, h);
-            }
-            else {
+            } else {
                 paintBorder(g2d, w, h);
             }
         }
@@ -595,12 +801,12 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
 
             final int x = iconAlignX == SwingConstants.CENTER
                     ? (int) ((w - sw) / 2 + iconInsets.getX())
-                            : (int) iconInsets.getX();
+                    : (int) iconInsets.getX();
 
-                    final int y = (int) (((h - sh) / 2) + iconInsets.getY());
+            final int y = (int) (((h - sh) / 2) + iconInsets.getY());
 
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                    g.drawImage(img, x, y, sw + x, sh + y, 0, 0, iw, ih, null);
+            g.drawImage(img, x, y, sw + x, sh + y, 0, 0, iw, ih, null);
         }
 
         super.paintComponent(g);
@@ -656,7 +862,7 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
 
     protected void resetIcon() {
         // Non-background icon
-        if (img != null && iconScaleAuto  && !iconInBackground) {
+        if (img != null && iconScaleAuto && !iconInBackground) {
             final int h = (int) (getHeight() * iconScaleFactor);
             final int w = (int) (h * iar);
             if (w == 0 || h == 0) { return; }
@@ -679,4 +885,5 @@ public class FLabel extends SkinnedLabel implements ILocalRepaint, IButton {
     public void setTextColor(final int r, final int g, final int b) {
         setForeground(new Color(r, g, b));
     }
+
 }

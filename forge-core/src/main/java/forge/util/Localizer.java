@@ -195,4 +195,10 @@ public class Localizer {
         public String languageID;
     }
 
+    public interface Localizable {
+        default Localizer localize() {
+            return Localizer.getInstance();
+        }
+    }
+
 }

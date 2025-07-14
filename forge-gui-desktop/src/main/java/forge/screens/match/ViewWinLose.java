@@ -1,22 +1,9 @@
 package forge.screens.match;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Point;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
-import java.util.List;
-
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-
-import org.apache.commons.lang3.StringUtils;
-
 import forge.game.GameLogEntry;
 import forge.game.GameLogEntryType;
 import forge.game.GameView;
+import forge.game.player.PlayerView;
 import forge.gui.SOverlayUtils;
 import forge.gui.UiCommand;
 import forge.gui.interfaces.IWinLoseView;
@@ -24,23 +11,23 @@ import forge.item.PaperCard;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.localinstance.skin.FSkinProp;
 import forge.model.FModel;
-import forge.toolbox.FButton;
-import forge.toolbox.FLabel;
-import forge.toolbox.FOverlay;
-import forge.toolbox.FScrollPane;
-import forge.toolbox.FSkin;
-import forge.toolbox.FSkin.Colors;
-import forge.toolbox.FSkin.SkinColor;
-import forge.toolbox.FSkin.SkinIcon;
-import forge.toolbox.FSkin.SkinnedLabel;
-import forge.toolbox.FSkin.SkinnedPanel;
-import forge.toolbox.FTextArea;
+import forge.screens.match.views.VField;
+import forge.toolbox.*;
+import forge.toolbox.FSkin.*;
 import forge.util.Localizer;
+
+import java.awt.*;
+import java.awt.datatransfer.*;
+import java.util.List;
+import javax.swing.*;
+
 import net.miginfocom.swing.MigLayout;
+import org.apache.commons.lang3.StringUtils;
 
 public class ViewWinLose implements IWinLoseView<FButton> {
     private final ControlWinLose control;
 
+    private final CMatchUI matchUI;
     private final FScrollPane scrLog;
     private final FButton btnContinue, btnRestart, btnQuit;
     private final SkinnedPanel pnlCustom;
@@ -63,6 +50,7 @@ public class ViewWinLose implements IWinLoseView<FButton> {
     @SuppressWarnings("serial")
     public ViewWinLose(final GameView game0, final CMatchUI matchUI) {
         this.game = game0;
+        this.matchUI = matchUI;
 
         final JPanel overlay = FOverlay.SINGLETON_INSTANCE.getPanel();
 
@@ -201,7 +189,8 @@ public class ViewWinLose implements IWinLoseView<FButton> {
         });
 
         showGameOutcomeSummary();
-        showPlayerScores();
+        showMatchResults();
+        showEndGameStateDetails();
     }
 
     public final ControlWinLose getControl() {
@@ -252,13 +241,25 @@ public class ViewWinLose implements IWinLoseView<FButton> {
         return this.pnlCustom;
     }
 
+    private void showEndGameStateDetails() {
+        for (PlayerView p : game.getPlayers()) {
+            FLabel lblPlayer = new FLabel.Builder().fontAlign(SwingConstants.LEFT)
+                                                   .fontStyle(Font.BOLD)
+                                                   .fontSize(14)
+                                                   .build();
+            lblPlayer.setText(p.getName());
+            pnlOutcomes.add(lblPlayer, "w 25%!, h 20px!, split 2");
+            pnlOutcomes.add(new VField.VCountersDisplayPanel(p).refresh(), "w 50%!, h 20px!");
+       }
+    }
+
     private void showGameOutcomeSummary() {
         for (final GameLogEntry o : game.getGameLog().getLogEntriesExact(GameLogEntryType.GAME_OUTCOME)) {
             pnlOutcomes.add(new FLabel.Builder().text(o.message).fontSize(14).build(), "h 20!");
         }
     }
 
-    private void showPlayerScores() {
+    private void showMatchResults() {
         for (final GameLogEntry o : game.getGameLog().getLogEntriesExact(GameLogEntryType.MATCH_RESULTS)) {
             lblStats.setText(removePlayerTypeFromLogMessage(o.message));
         }

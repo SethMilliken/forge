@@ -39,13 +39,13 @@ import forge.view.arcane.PlayArea;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 import javax.swing.*;
 import javax.swing.border.*;
 
-import net.miginfocom.layout.AC;
 import net.miginfocom.layout.CC;
 import net.miginfocom.layout.LC;
 import net.miginfocom.swing.MigLayout;
@@ -60,16 +60,17 @@ import org.slf4j.LoggerFactory;
 public class VField implements IVDoc<CField>, Localizer.Localizable {
     private static final Logger log = LoggerFactory.getLogger(VField.class);
 
+    private static final int DEFAULT_FONT_SIZE = 28;
     private static final int DEFAULT_TEXT_GAP = DEFAULT_FONT_SIZE / 4;
 
     private static final int HEIGHT = DEFAULT_FONT_SIZE + (DEFAULT_TEXT_GAP * 4);
 
-    private static final int AVATAR_MIN_WIDTH = 325;
+    private static final int AVATAR_MIN_WIDTH = 100;
     private static final int AVATAR_MIN_HEIGHT = AVATAR_MIN_WIDTH * 1;
     private static final int AVATAR_DEFAULT_WIDTH = AVATAR_MIN_WIDTH * 2;
     private static final int AVATAR_DEFAULT_HEIGHT = AVATAR_MIN_HEIGHT * 2;
 
-    private static final int COUNTER_MIN_WIDTH = 175;
+    private static final int COUNTER_MIN_WIDTH = 60;
     private static final int COUNTER_MIN_HEIGHT = HEIGHT;
 
     private static final int COUNTER_PANEL_MIN_WIDTH = DEFAULT_TEXT_GAP * 10;
@@ -136,10 +137,10 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
         final JPanel pnl = parentCell.getBody();
         pnl.setLayout(new MigLayout("insets 0, gap 0"));
 
-        pnl.add(avatarArea, "w 10%!, h 35%!");
-        pnl.add(phaseIndicator, "w 5%!, h 100%!, span 1 2");
-        pnl.add(scroller, "w 85%!, h 100%!, span 1 2, wrap");
-        pnl.add(detailsPanel, "w 10%!, h 64%!, gapleft 1px");
+        pnl.add(avatarArea, avatarAreaCc());
+        pnl.add(phaseIndicator, phaseCc());
+        pnl.add(scroller, scrollerCc());
+        pnl.add(detailsPanel, detailsCc());
     }
 
     public void updateManaPool() {
@@ -205,7 +206,7 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
      * Manages display of Avatar and CounterDetails.
      */
     protected static class AvatarArea extends SkinnedPanel {
-        private final VCounterDisplayPanel counters;
+        private final VCountersDisplayPanel counters;
         private final FLabel lblAvatar = new FLabel.Builder().fontAlign(SwingConstants.CENTER)
                                                              .iconScaleFactor(1.0f)
                                                              .build();
@@ -222,7 +223,7 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
             //lblAvatar.setText(player.getName());
             setOpaque(false);
             setBackground(FSkin.getColor(FSkin.Colors.CLR_HOVER));
-            counters = new VCounterDisplayPanel(player);
+            counters = new VCountersDisplayPanel(player);
             applyLayout();
             // Player area hover effect
             addMouseListener(new MouseAdapter() {
@@ -245,11 +246,12 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
         }
 
         protected void applyLayout() {
-            setLayout(new MigLayout(
-                              new LC().insets("0").gridGap("0", "0").width("100%").wrapAfter(1),
-                              new AC().grow()
-                      )
-            );
+            setLayout(avatarContainerLayout());
+            //setLayout(new MigLayout(
+            //                  new LC().insets("0").gridGap("0", "0").width("100%").wrapAfter(1),
+            //                  new AC().grow()
+            //          )
+            //);
             //setLayout(new GridLayout(2, 1, 2, 2));
             int rightPadding = 6;
             int bottomPadding = 3;
@@ -257,13 +259,16 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
 
             //add(lblAvatar, String.format("w 100%%-%spx!, h 100%%-%spx!, wrap, gap 3 3 3 0", rightPadding, spaceForCounterDetails));
             //add(counters, String.format("w 100%%!, h %spx!, wrap", CounterDisplayPanel.PANEL_HEIGHT));
-            add(lblAvatar, new CC().grow().width("100%").height("100%-20px"));
-            add(counters, new CC().grow().width("100%").minHeight("20px").wrap());
+            //add(lblAvatar, new CC().grow().width("100%").height("100%-20px"));
+            //add(counters, new CC().grow().width("100%").minHeight("20px").wrap());
+
+            add(lblAvatar, avatarCc());
+            add(counters, countersPanelCc());
         }
 
         protected void setAvatar(final SkinImage avatar) {
             lblAvatar.setIcon(avatar);
-            lblAvatar.getResizeTimer().start();
+            lblAvatar.refresh();
         }
 
         protected boolean isHighlighted() {
@@ -271,16 +276,182 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
         }
 
         public void updateDetails() {
-            counters.updateDetails();
+            counters.refresh();
             final boolean highlighted = isHighlighted();
             setBorder(highlighted ? borderAvatarHighlighted : borderAvatarSimple);
             setOpaque(highlighted);
             setToolTipText(player.getDetailsHtml());
+            lblAvatar.refresh();
         }
 
     }
 
-    public static class VCounterDisplayPanel extends JPanel {
+    public static class VCountersDisplayPanel extends JPanel {
+        private final PlayerView player;
+
+        protected List<CounterDisplay> prioritizedCounters = createPrioritizedCounterDisplays();
+
+        protected List<CounterDisplay> createPrioritizedCounterDisplays() {
+            List<CounterDisplay> cds = new LinkedList<>();
+            cds.add(new LifeCounterDisplay());
+            cds.add(new PoisonCounterDisplay());
+            cds.add(new EnergyCounterDisplay());
+            cds.add(new ExperienceCounterDisplay());
+            cds.add(new RadCounterDisplay());
+            cds.add(new TicketCounterDisplay());
+            return cds;
+        }
+
+        public VCountersDisplayPanel(PlayerView player) {
+            super(counterPanelLayout(1, 1));
+            this.player = player;
+            setOpaque(false);
+            setMinimumSize(new Dimension(0, COUNTER_MIN_HEIGHT * 3));
+            addComponentListener(listener());
+            setCounters(prioritizedCounters);
+            setBorder(BorderFactory.createLineBorder(Color.green));
+        }
+
+        public void setCounters(List<CounterDisplay> counters) {
+            removeAll();
+            counters.forEach(this::addCounter);
+            refresh();
+            validate();
+        }
+
+        public VCountersDisplayPanel refresh() {
+            boolean hasAnythingChanged = updateCounters();
+            //if (hasAnythingChanged) {
+            //    //removeAll();
+            //    //addNonZeroCounters(visibleCountersAllowed);
+            //}
+            refreshImpl();
+            return this;
+        }
+
+        private boolean updateCounters() {
+            boolean isAnythingDifferent = false;
+            for (CounterDisplay cd : prioritizedCounters) {
+                boolean didCounterChange = cd.refresh(player);
+                if (didCounterChange) {
+                    cd.setVisible(cd::isNonZero);
+                }
+                isAnythingDifferent |= didCounterChange; // This becomes true only if a counter has changed.
+            }
+            return isAnythingDifferent;
+        }
+
+        public void refreshImpl() {
+            // Reset layout with new visibility parameters
+            setLayout(counterPanelLayout(calculateDisplayableCount(), calculateVisibleCount()));
+
+            // Handle very limited space by removing the icon from the first counter
+            boolean isAvailableSpaceSufficient = getWidth() > COUNTER_MIN_WIDTH;
+            getFirstCounter().ifPresent(c -> c.showIcon(isAvailableSpaceSufficient));
+
+            // Handle component visibility
+            updateCounterVisibility();
+
+            int displayableCount = calculateDisplayableCount();
+            int visibleCount = calculateVisibleCount();
+            long showCount = Math.min(displayableCount, visibleCount);
+            log.info(
+                    "CountersDisplayPanel refreshed: containerWidth: {}, minWidth: {}, minWidth * shown: {},  displayable: {}, visible: {}, shown: {}"
+                    , getWidth()
+                    , COUNTER_MIN_WIDTH
+                    , COUNTER_MIN_WIDTH * showCount
+                    , displayableCount
+                    , visibleCount
+                    , showCount
+            );
+        }
+
+        private void updateCounterVisibility() {
+            int displayableCount = calculateDisplayableCount();
+            int displayedCount = displayableCount;
+            List<Integer> widths = new ArrayList<>();
+            int visibleCount = 0;
+            synchronized (getTreeLock()) {
+                for (Component component : getComponents()) {
+                    if (component instanceof CounterDisplay) {
+                        CounterDisplay counter = (CounterDisplay) component;
+                        boolean isVisible = counter.isNonZero();
+                        //counter.setVisible(isVisible && 0 < displayedCount--);
+                        counter.setVisible(isVisible);
+                        if (isVisible) visibleCount++;
+                        // We must re-add components here because their original constraints will have been lost when we reset the layout for their container.
+                        addCounter(counter);
+                        widths.add(counter.getWidth());
+                    }
+                }
+            }
+            log.info(
+                    "Counter visibility: displayable: {}, visible: {}, widths: {}, sum: {}"
+                    , displayableCount
+                    , visibleCount
+                    , widths.stream()
+                            .map(String::valueOf)
+                            .collect(Collectors.joining("|"))
+                    , widths.stream()
+                            .mapToInt(Integer::intValue)
+                            .sum()
+            );
+        }
+
+        private void addCounter(CounterDisplay counter) {
+            add(counter, counterCc());
+        }
+
+        private Optional<CounterDisplay> getFirstCounter() {
+            synchronized (getTreeLock()) {
+                return Arrays.stream(getComponents())
+                             .filter(CounterDisplay.class::isInstance)
+                             .map(CounterDisplay.class::cast)
+                             .findFirst();
+            }
+        }
+
+        private int calculateVisibleCount() {
+            synchronized (getTreeLock()) {
+                long visibleCount = Arrays.stream(getComponents())
+                                          .filter(CounterDisplay.class::isInstance)
+                                          .map(CounterDisplay.class::cast)
+                                          .filter(CounterDisplay::isNonZero)
+                                          .count();
+                return Math.toIntExact(visibleCount);
+            }
+        }
+
+        private int calculateDisplayableCount() {
+            return Math.max(Math.floorDiv(getWidth(), COUNTER_MIN_WIDTH), 1);
+        }
+
+        public ComponentListener listener() {
+            VCountersDisplayPanel panel = this;
+            return new ComponentListener() {
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    log.trace("Resized: {}", e);
+                    panel.refresh();
+                }
+
+                @Override
+                public void componentMoved(ComponentEvent e) {
+                }
+
+                @Override
+                public void componentShown(ComponentEvent e) {
+                }
+
+                @Override
+                public void componentHidden(ComponentEvent e) {
+                }
+            };
+        }
+
+    }
+
+    public static class VOldCounterDisplayPanel extends JPanel {
         protected final static int PANEL_HEIGHT = 20;
 
         private final static int DEFAULT_VISIBLE_COUNTERS = 5; // Includes Life Total
@@ -305,7 +476,7 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
          *
          * @param player &emsp; {@link PlayerView} providing counts for counters.
          */
-        public VCounterDisplayPanel(PlayerView player) {
+        public VOldCounterDisplayPanel(PlayerView player) {
             this.player = player;
             setOpaque(false);
             //setBackground(FSkin.getColor(FSkin.Colors.CLR_OVERLAY));
@@ -314,7 +485,7 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
             //        new AC().grow())
             //);
             //setLayout(new FlowLayout(FlowLayout.CENTER, 2, 2));
-            setLayout(counterPanelLayout(1, 1))
+            setLayout(counterPanelLayout(1, 1));
             setBorder(BorderFactory.createLineBorder(Color.yellow, 2));
             addFirstItem();
             setVisible(true);
@@ -324,7 +495,7 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
             refresh(DEFAULT_VISIBLE_COUNTERS);
         }
 
-        public VCounterDisplayPanel refresh(int visibleCountersAllowed) {
+        public VOldCounterDisplayPanel refresh(int visibleCountersAllowed) {
             boolean hasAnythingChanged = updateCounters();
             if (hasAnythingChanged) {
                 removeAll();
@@ -388,6 +559,98 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
     }
 
     public static abstract class CounterDisplay extends FLabel {
+        private final FSkinProp iconProp;
+
+        protected String name;
+        protected int count, previousCount = 0;
+        protected CounterEnumType type;
+
+        // Common defaults for all Counters
+        private static final FLabel.Builder LABEL_TEMPLATE = new FLabel.Builder()
+                .suppressFocusable(true)
+                .fontAlign(SwingConstants.RIGHT)
+                .fontStyle(Font.BOLD)
+                .iconAlignX(SwingConstants.CENTER)
+               // .iconInBackground()
+                ;
+
+        public CounterDisplay(String name, FSkinProp iconProp) {
+            super(LABEL_TEMPLATE.copy().iconImage(iconProp));
+            this.name = name;
+            this.iconProp = iconProp;
+            //if (count == 0) setEnabled(false);
+
+            // Align all contents
+            setHorizontalAlignment(SwingConstants.CENTER);
+
+            // Align text wrt to image
+            setHorizontalTextPosition(SwingConstants.RIGHT);
+            //setFont(new Font(DEFAULT_FONT, Font.BOLD, DEFAULT_FONT_SIZE));
+            //setForeground(Color.white);
+
+            setIconTextGap(DEFAULT_TEXT_GAP);
+            setBorder(BorderFactory.createLineBorder(Color.white));
+            showIcon(true);
+            setVisible(true);
+        }
+
+        protected void showIcon(boolean isIconVisible) {
+            if (isIconVisible) {
+                SkinImage image = FSkin.getImage(iconProp);
+                setIcon(image);
+            } else {
+                ((JLabel)this).setIcon(null);
+            }
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        /**
+         * Refresh the count and update the label.
+         *
+         * @param player &emsp; {@link PlayerView} from which the count is derived.
+         * @return boolean &emsp; <code>true</code> if the count changed since the last invocation, <code>false</code> otherwise.
+         */
+        public boolean refresh(PlayerView player) {
+            count = retrieveCount(player);
+            //if (count == previousCount) return false; // No need to do anything if the count did not change.
+
+            setText(String.valueOf(count));
+            updateCriticalIndicator();
+            previousCount = count;
+            return true;
+        }
+
+        protected int retrieveCount(PlayerView player) {
+            return player.getCounters(type);
+        }
+
+        public void setVisible(BooleanSupplier visibilityCondition) {
+            setVisible(visibilityCondition.getAsBoolean());
+        }
+
+        protected void updateCriticalIndicator() {
+            if (isCritical()) {
+                setForeground(Color.RED);
+            } else {
+                FSkin.SkinColor textColor = FSkin.getColor(forge.toolbox.FSkin.Colors.CLR_TEXT);
+                setForeground(textColor);
+            }
+        }
+
+        protected boolean isNonZero() {
+            return count > 0;
+        }
+
+        protected boolean isCritical() {
+            return false;
+        }
+
+    }
+
+    public static abstract class OldCounterDisplay extends FLabel {
         // Common defaults for all Counters
         private static final FLabel.Builder LABEL_TEMPLATE = new FLabel.Builder()
                 .suppressFocusable(true)
@@ -400,7 +663,7 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
         protected CounterEnumType type;
         protected int count, previousCount = 0;
 
-        public CounterDisplay(String name, FSkinProp iconProp) {
+        public OldCounterDisplay(String name, FSkinProp iconProp) {
             super(LABEL_TEMPLATE.copy().iconImage(iconProp));
             setIconTextGap(25);
             setHorizontalAlignment(SwingConstants.CENTER);
@@ -518,9 +781,12 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
     }
 
 
-    private static LayoutManager topLevelLayout() {
+    private static LayoutManager avatarContainerLayout() {
         LC lc = new LC()
-                .fill();
+                .flowY()
+               // .maxHeight(String.valueOf(200))
+                .fill()
+                ;
         if (DEBUG_RATE[0] > 0) {
             lc.debug(DEBUG_RATE[0]);
         }
@@ -532,6 +798,10 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
         log.info("CounterPanelLayout displayedCount: {}", displayedCount);
         LC lc = new LC()
                 .flowX()
+                .height("20%!")
+                //.minHeight(String.valueOf(COUNTER_MIN_HEIGHT))
+                .maxHeight(String.valueOf(COUNTER_MIN_HEIGHT))
+                //.height(String.valueOf(COUNTER_MIN_HEIGHT))
                 .wrapAfter(displayedCount);
         if (DEBUG_RATE[0] > 0) {
             lc.debug(DEBUG_RATE[0]);
@@ -540,23 +810,84 @@ public class VField implements IVDoc<CField>, Localizer.Localizable {
         //return new FlowLayout(FlowLayout.CENTER, DEFAULT_TEXT_GAP, DEFAULT_TEXT_GAP / 2);
     }
 
-    private static CC logoCc() {
+    private static CC phaseCc() {
         return new CC()
-                .maxHeight(String.valueOf(AVATAR_DEFAULT_HEIGHT))
-                //.minHeight(String.valueOf(AVATAR_MIN_HEIGHT))
-                .width(String.valueOf(AVATAR_DEFAULT_WIDTH))
-                .height(String.valueOf(AVATAR_DEFAULT_HEIGHT))
+                .width("5%!")
+                .height("100%!")
+                .gapLeft("1")
+                .span(1, 2)
+                .shrinkPrio(5, 5)
+                .shrink(25)
+                .push()
                 .grow()
                 ;
     }
 
-    private static CC panelCc() {
+    private static CC scrollerCc() {
         return new CC()
-                .minHeight(String.valueOf(HEIGHT))
-                .maxHeight(String.valueOf(HEIGHT))
-                .minWidth(String.valueOf(COUNTER_PANEL_MIN_WIDTH))
-                .width(String.valueOf(COUNTER_PANEL_DEFAULT_WIDTH))
-                .height(String.valueOf(HEIGHT))
+                .width("85%!")
+                .height("100%!")
+                .gapLeft("1")
+                .span(1, 2)
+                .wrap()
+                .shrinkPrio(3, 3)
+                .shrink(50)
+                .push()
+                .grow()
+                ;
+    }
+
+    private static CC detailsCc() {
+        return new CC()
+                .width("15%!")
+                .height("60%!")
+                .gapLeft("1")
+                .shrinkPrio(2, 2)
+                .shrink(50)
+                .push()
+                .grow()
+                ;
+    }
+
+    private static CC avatarAreaCc() {
+        return new CC()
+                .width("15%")
+                .height("40%!")
+                .shrinkPrio(1, 1)
+                .shrink(50)
+                .push()
+                .grow()
+                ;
+    }
+
+    private static CC avatarCc() {
+        return new CC()
+                //.span(2)
+                //.maxHeight(String.valueOf(AVATAR_DEFAULT_HEIGHT))
+                //.minHeight(String.valueOf(AVATAR_MIN_HEIGHT))
+                //.width(String.valueOf(AVATAR_DEFAULT_WIDTH))
+                //.maxWidth(String.valueOf(COUNTER_MIN_WIDTH * 3))
+                .height("80%")
+                .dockNorth()
+                .shrinkPrio(1, 1)
+                .shrink(50)
+                .push()
+                .grow()
+                ;
+    }
+
+    private static CC countersPanelCc() {
+        return new CC()
+                //.span(1)
+                //.minHeight(String.valueOf(COUNTER_MIN_HEIGHT / 2))
+                .maxHeight(String.valueOf(COUNTER_MIN_HEIGHT * 2))
+                //.minWidth(String.valueOf(COUNTER_PANEL_MIN_WIDTH))
+                //.width(String.valueOf(COUNTER_PANEL_DEFAULT_WIDTH))
+                //.height(String.valueOf(HEIGHT))
+                .push()
+                .grow()
+                .shrink(100)
+                .shrinkPrio(2, 2)
                 .dockSouth()
                 ;
     }

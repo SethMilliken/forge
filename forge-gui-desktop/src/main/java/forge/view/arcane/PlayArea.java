@@ -17,14 +17,6 @@
  */
 package forge.view.arcane;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Rectangle;
-import java.awt.event.MouseEvent;
-import java.util.*;
-
-import com.google.common.collect.Lists;
-
 import forge.game.card.CardView;
 import forge.game.card.CardView.CardStateView;
 import forge.game.player.PlayerView;
@@ -37,6 +29,13 @@ import forge.toolbox.FScrollPane;
 import forge.toolbox.MouseTriggerEvent;
 import forge.view.arcane.util.Animation;
 import forge.view.arcane.util.CardPanelMouseListener;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+import java.util.List;
+
+import com.google.common.collect.Lists;
 
 /**
  * <p>
@@ -77,6 +76,8 @@ public class PlayArea extends CardPanelContainer implements CardPanelMouseListen
     private boolean makeTokenRow = true;
     private boolean stackCreatures = false;
 
+    // FIXME: player is hard-coded into tabletop...should be dynamic
+    // (haven't looked into it too deeply). Doublestrike 2012-04-12
     public PlayArea(final CMatchUI matchUI, final FScrollPane scrollPane, final boolean mirror, final PlayerView player, final ZoneType zone) {
         super(matchUI, scrollPane);
         this.setBackground(Color.white);
