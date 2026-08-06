@@ -17,6 +17,7 @@
  */
 package forge.screens.deckeditor.controllers;
 
+import forge.ImageCache;
 import forge.ImageKeys;
 import forge.card.ColorSet;
 import forge.card.MagicColor;
@@ -554,6 +555,15 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
             
             GuiUtils.addMenuItem(menu, label, null, () -> {
                 toggleCardKeyStatus(currentDeck, selectedCard);
+                TItem selectedItem = getItemManager().getSelectedItem();
+                if (selectedItem instanceof PaperCard) {
+                    PaperCard card = ((PaperCard) selectedItem);
+                    ImageKeys.removeImage(card);
+                    ImageCache.invalidate(card.getImageKey(false));
+                    ImageFetcher.Callback callback = new ImageRefresher(card);
+                    GuiBase.getInterface().getImageFetcher().fetchImage(card.getImageKey(false), callback);
+                    getItemManager().refresh();
+                }
             }, true, true);
         }
         
@@ -657,6 +667,18 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
                     cardManager.setSelectedItem(updated);
                 }, true, true);
             }
+        }
+    }
+
+    private class ImageRefresher implements ImageFetcher.Callback {
+        private final PaperCard card;
+        public ImageRefresher(PaperCard card) {
+            this.card = card;
+        }
+
+        @Override
+        public void onImageFetched() {
+            card.hasImage(true);
         }
     }
 }
