@@ -500,17 +500,13 @@ public abstract class ImageFetcher {
         }
         // Note: No synchronization is needed here because this is executed on
         // EDT thread (see assert on top) and so is the notification of observers.
-        HashSet<Callback> observers = currentFetches.get(destPath);
-        if (observers != null) {
+        HashSet<Callback> observers = currentFetches.getOrDefault(destPath, new HashSet<>());
+        if (observers.size() > 0) {
             // Already in the queue, simply add the new observer.
             observers.add(callback);
             return;
-        } else if (fetching.contains(destPath)) {
-            // Already fetching, but somehow no observers?
-            return;
         }
 
-        observers = new HashSet<>();
         observers.add(callback);
         fetching.add(destPath);
         currentFetches.put(destPath, observers);

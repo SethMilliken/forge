@@ -17,34 +17,16 @@
  */
 package forge.screens.deckeditor.controllers;
 
-import java.awt.Toolkit;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import java.util.List;
-import java.util.Map.Entry;
-
-import javax.swing.JMenu;
-import javax.swing.JPopupMenu;
-import javax.swing.KeyStroke;
-import javax.swing.SwingUtilities;
-
+import forge.ImageKeys;
 import forge.card.ColorSet;
 import forge.card.MagicColor;
-import forge.deck.CardPool;
-import forge.deck.Deck;
-import forge.deck.DeckBase;
-import forge.deck.DeckFormat;
-import forge.deck.DeckSection;
+import forge.deck.*;
 import forge.game.GameType;
 import forge.gui.GuiBase;
 import forge.gui.GuiChoose;
 import forge.gui.GuiUtils;
 import forge.gui.UiCommand;
-import forge.gui.framework.DragCell;
-import forge.gui.framework.FScreen;
-import forge.gui.framework.ICDoc;
-import forge.gui.framework.IVDoc;
-import forge.gui.framework.SRearrangingUtil;
+import forge.gui.framework.*;
 import forge.item.InventoryItem;
 import forge.item.PaperCard;
 import forge.itemmanager.CardManager;
@@ -65,6 +47,12 @@ import forge.toolbox.FLabel;
 import forge.toolbox.FSkin;
 import forge.util.*;
 import forge.view.FView;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.util.List;
+import java.util.Map.Entry;
+import javax.swing.*;
 
 /**
  * Maintains a generically typed architecture for various editing
@@ -217,7 +205,7 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
 
         for (final Entry<TItem, Integer> itemEntry : itemsToAdd) {
             final TItem item = itemEntry.getKey();
-            final PaperCard card = item instanceof PaperCard pc ? pc : null;
+            final PaperCard card = item instanceof PaperCard ? (PaperCard)item : null;
             int qty = itemEntry.getValue();
 
             int max;
@@ -505,6 +493,7 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
                 cardManager.setSelectedItem(foiledCard);
             }, true, true);
         }
+
         //TODO: need to translate getItemDisplayString
         private void addItem(final String verb, final String dest, final boolean toAlternate, final int qty, final int shortcutModifiers) {
             String label = verb + " " + SItemManagerUtil.getItemDisplayString(getItemManager().getSelectedItems(), qty, false);
@@ -524,6 +513,27 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
                 }
             }, true, shortcutModifiers == 0);
         }
+
+        private void addRefetchImage() {
+            if (this.menu.getComponentCount() > 0) {
+                this.menu.addSeparator();
+            }
+            String label = "Refetch Image";
+            //String label = String.format("Refetch Image", SItemManagerUtil.getItemDisplayString(getItemManager().getSelectedItems(), qty, false));
+            GuiUtils.addMenuItem(
+                    menu, label, null, () -> {
+                        TItem selectedItem = getItemManager().getSelectedItem();
+                        if (selectedItem instanceof PaperCard) {
+                            PaperCard card = ((PaperCard) selectedItem);
+                            ImageKeys.removeImage(card);
+                            GuiBase.getInterface()
+                                   .getImageFetcher()
+                                   .fetchImageWithoutCallback(card.getImageKey(false));
+                        }
+                    }, true, true
+            );
+        }
+
 
         /**
          * Add context menu entry for marking/unmarking cards as key cards
@@ -600,6 +610,7 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
             final int max = getMaxMoveQuantity();
             if (max == 0) { return; }
 
+            // e.g. Move card to deck, Move card to sideboard
             addItem(verb, dest, toAlternate, 1, shortcutModifiers1);
             if (max == 1) { return; }
 
@@ -616,6 +627,7 @@ public abstract class ACEditorBase<TItem extends InventoryItem, TModel extends D
 
         public void addMoveItems(final String verb, final String dest) {
             addItems(verb, dest, false, 0, InputEvent.SHIFT_DOWN_MASK, InputEvent.ALT_DOWN_MASK);
+            addRefetchImage();
         }
 
         public void addMoveAlternateItems(final String verb, final String dest) {

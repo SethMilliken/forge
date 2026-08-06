@@ -225,6 +225,10 @@ public class PaperCard implements Comparable<IPaperCard>, InventoryItemFromSet, 
         return hasImage;
     }
 
+    public void invalidateImageCache() {
+        hasImage = false;
+    }
+
     public PaperCard(final CardRules rules0, final String edition0, final CardRarity rarity0) {
         this(rules0, edition0, rarity0, IPaperCard.DEFAULT_ART_INDEX, false,
                 IPaperCard.NO_COLLECTOR_NUMBER, IPaperCard.NO_ARTIST_NAME, IPaperCard.NO_FUNCTIONAL_VARIANT);

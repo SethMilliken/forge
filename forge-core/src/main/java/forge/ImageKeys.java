@@ -5,12 +5,17 @@ import forge.item.PaperCard;
 import forge.util.FileUtil;
 import forge.util.TextUtil;
 import forge.util.ThreadUtil;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.util.*;
 
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public final class ImageKeys {
+    private static final Logger log = LoggerFactory.getLogger(ImageKeys.class);
+
     public static final String CARD_PREFIX           = "c:";
     public static final String TOKEN_PREFIX          = "t:";
     public static final String ICON_PREFIX           = "i:";
@@ -405,6 +410,18 @@ public final class ImageKeys {
             }
         }
         return null;
+    }
+
+    public static boolean removeImage(PaperCard card) {
+        card.invalidateImageCache();
+        String imageKey = card.getCardImageKey();
+        cachedCards.remove(imageKey);
+        File imageFile = getImageFile(imageKey);
+        if (imageFile != null) {
+            log.info("Removing image for: {}", imageFile.getPath());
+            return imageFile.delete();
+        }
+        return false;
     }
 
     //shortcut for determining if a card image exists for a given card
